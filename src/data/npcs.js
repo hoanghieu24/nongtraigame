@@ -1,0 +1,51 @@
+// look: dùng để dựng nhân vật procedural. lines: thoại ngắn ngẫu nhiên.
+export const NPCS = {
+  farmer:    { name: 'Bác Hai Nông Dân',  role: 'Chủ Cửa Hàng Hạt Giống', icon: '👨‍🌾', home: { x: 42, z: -2.4 }, wander: 1.8, shop: 'seed',
+               look: { skin: 0xe8b48a, hair: 0x6b5a4a, style: 'short', outfit: 0x6aa84f, hat: 'straw' },
+               lines: ['Cà rốt hợp mùa xuân với mùa thu đó nha!', 'Tưới nước rồi cây lớn nhanh gấp ba luôn.', 'Hai người cùng làm ruộng thì nhanh gấp đôi. Thiệt đó!', 'Bí ngô là niềm tự hào của bác.'],
+               rain: 'Mưa rồi! Khỏi tưới cây nữa, đi câu cá thôi!', thief: 'Trời ơi, có trộm! Đuổi nó đi!' },
+  shopkeeper:{ name: 'Cô Mai Tạp Hóa',    role: 'Chủ Tạp Hóa',            icon: '👩‍🍳', home: { x: 62, z: 6.3 }, wander: 1.2, shop: 'general',
+               look: { skin: 0xf2c4a0, hair: 0x3b2a20, style: 'bun', outfit: 0xf3a6c4, hat: 'none' },
+               lines: ['Mồi câu thơm lắm, cá mê tít!', 'Mũ mới về nè, đội vào là đẹp trai ra liền.', 'Cô nói bé nghe: bán nông sản đừng bán rẻ nha.', 'Thức ăn gia súc giá hạt dẻ đây!'],
+               rain: 'Mưa quá, khách ít nhưng cô vẫn mở cửa!', thief: 'Á á á! Trộm! Cô sợ lắm!' },
+  animalkeeper:{ name: 'Chú Tư Chăn Nuôi', role: 'Bán Thú Cưng',          icon: '🧑‍🌾', home: { x: 62, z: -2.4 }, wander: 1.4, shop: 'animal',
+               look: { skin: 0xd9a37a, hair: 0x2c2c2c, style: 'short', outfit: 0xd6a04a, hat: 'cowboy' },
+               lines: ['Gà thì dễ nuôi nhưng ưa chạy lung tung.', 'Con dê nào húc cháu thì đừng giận nó nha.', 'Cho ăn đầy đủ, thú vui là đẻ trứng liền.', 'Heo thích lăn bùn. Đừng hỏi tại sao.'],
+               rain: 'Mưa thì con heo càng sướng!', thief: 'Bảo vệ đàn thú giùm chú với!' },
+  furnisher: { name: 'Chị Lụa Nội Thất',  role: 'Bán Nội Thất',           icon: '👩‍🎨', home: { x: 42, z: 6.4 }, wander: 1.4, shop: 'furniture',
+               look: { skin: 0xf0c7a5, hair: 0xb4553a, style: 'long', outfit: 0x9ec9f2, hat: 'flower' },
+               lines: ['Thảm tròn là hợp mệnh mọi ngôi nhà.', 'Bấm nút búa để xếp đồ nhé!', 'Nhà nâng cấp là chỗ đặt đồ nhiều hơn đó.', 'Bể cá cảnh xinh lắm, nhìn hoài không chán.'],
+               rain: 'Ẩm quá, nhớ kê tủ cách tường nha.', thief: 'Đừng cho trộm khuân sofa của tôi!' },
+  fisherman: { name: 'Ông Sáu Câu Cá',    role: 'Ngư Dân',                icon: '🧓', home: { x: 4.6, z: 21.4 }, wander: 2, shop: null, buyFish: 1.15,
+               look: { skin: 0xd8a27c, hair: 0xdddddd, style: 'beard', outfit: 0x4c86b9, hat: 'beanie' },
+               lines: ['Cá cắn thì kéo liền, đừng ngủ gật.', 'Đêm xuống là cá trê lên chơi đó.', 'Nghe đồn ngoài biển có cá rồng...', 'Ông thu mua cá giá cao hơn 15%, lại đây!'],
+               rain: 'Trời mưa cá cắn mạnh lắm nghen!', thief: 'Hồi xưa ông đuổi trộm nhanh lắm...' },
+  chef:      { name: 'Bếp Trưởng Bo',     role: 'Đầu Bếp',                icon: '🧑‍🍳', home: { x: 47, z: -16.5 }, wander: 0.8, shop: null,
+               look: { skin: 0xf0c7a5, hair: 0x222222, style: 'short', outfit: 0xffffff, hat: 'chef' },
+               lines: ['Bếp sạch là bếp vui!', 'Món nào cũng cần một chút tình yêu... và trứng.', 'Nấu nhanh lên, khách đang đói!', 'Ta không cho ai đụng vào chảo của ta.'],
+               rain: 'Mưa thế này ăn súp là chuẩn.', thief: 'Chảo của ta đâu rồi?!' },
+  grandma:   { name: 'Bà Ba Kẹo Bánh',    role: 'Bà Cụ Hàng Xóm',         icon: '👵', home: { x: 47, z: 5.4 }, wander: 2.2, shop: null,
+               look: { skin: 0xf2d0b6, hair: 0xf0f0f0, style: 'bun', outfit: 0xb49bd9, hat: 'none', glasses: true },
+               lines: ['Bà hồi xưa trồng bí ngô to bằng cái nồi.', 'Con ơi giúp bà chút xíu nhé?', 'Ăn bánh không con? Bà mới nướng.', 'Thời của bà không có cái điện thoại này.'],
+               rain: 'Mưa rồi, ôm chăn ngồi ăn bánh thôi.', thief: 'Bà giơ gậy ra đây! Lại đây!' },
+  kid:       { name: 'Bé Bo Nghịch Ngợm', role: 'Trẻ Con',                icon: '🧒', home: { x: 52, z: 3 }, wander: 8, shop: null, scale: 0.72,
+               look: { skin: 0xf2c4a0, hair: 0x2c1f18, style: 'short', outfit: 0xff9f5a, hat: 'cap' },
+               lines: ['Con gà kia đuổi con nè!', 'Mẹ nói không được đụng vào con dê.', 'Ai bắt được con bướm này không?', 'Hì hì, trốn tìm không?'],
+               rain: 'Nhảy vũng nước nè!', thief: 'Cứu cứu, ông ba bị!' },
+  delivery:  { name: 'Tí Shipper Giao Hàng', role: 'Giao Hàng Tận Nơi',   icon: '🛵', home: { x: 9.5, z: 8.6 }, wander: 1.2, shop: 'delivery',
+               look: { skin: 0xe4b08a, hair: 0x2b2b2b, style: 'short', outfit: 0xff6f4d, hat: 'cap' },
+               lines: ['Hạt giống giao tận ruộng, phí ship nhỏ xíu!', 'Em chạy nhanh hơn cả gà chạy.', 'Có đơn hàng nào cần giao không anh chị?', 'Nhớ bấm sao 5 cho em nha!'],
+               rain: 'Ướt hết rồi, nhưng vẫn giao!', thief: 'Á, xe em! Trộm ơi!' },
+};
+export const NPC_LIST = Object.keys(NPCS);
+
+// khách nhà hàng có cá tính
+export const CUSTOMERS = {
+  oldman: { name: 'Ông Khó Tính',      icon: '👴', order: 'Cho tôi món ngon nhất!', happy: 'Hừm... được đấy.', angry: 'Chậm quá, tôi về!', patience: 85, eat: 10, tip: 0.2,  picky: true, look: { skin: 0xe2b18a, hair: 0xeeeeee, style: 'beard', outfit: 0x7a6a58, hat: 'none' } },
+  cat:    { name: 'Mèo Tam Thể',       icon: '🐈', order: 'Meow.',                  happy: 'Meooow~',            angry: 'Hự!',              patience: 60, eat: 4,  tip: 0.1,  likes: 'fish', animal: 'cat' },
+  kid:    { name: 'Bé Bơ',             icon: '🧒', order: 'Cho cháu bánh!',         happy: 'Ngon quá trời!',     angry: 'Huhu con đói!',    patience: 45, eat: 5,  tip: 0.05, likes: 'sweet', look: { skin: 0xf2c4a0, hair: 0x3a2a1a, style: 'short', outfit: 0x8fd0ff, hat: 'cap' }, scale: 0.72 },
+  granny: { name: 'Bà Ngoại Rộng Rãi', icon: '👵', order: 'Cho bà món nào cũng được con.', happy: 'Con ngoan, bà thưởng!', angry: 'Thôi bà đi chợ.', patience: 130, eat: 14, tip: 0.35, look: { skin: 0xf0cdb2, hair: 0xf2f2f2, style: 'bun', outfit: 0xd68fb4, hat: 'none', glasses: true } },
+  fancy:  { name: 'Ngài Heo Lịch Lãm', icon: '🐷', order: 'Món đắt nhất. Tính tiền gấp đôi!', happy: 'Tuyệt hảo, khà khà!', angry: 'Phục vụ kiểu gì đây!', patience: 50, eat: 9, tip: 0.4, picky: true, likes: 'fancy', animal: 'pig' },
+  jolly:  { name: 'Chú Vui Tính',      icon: '🤠', order: 'Món nào cũng ngon, miễn vui!', happy: 'Ha ha ha! Ngon!', angry: 'Hơi lâu đó nha.', patience: 95, eat: 6, tip: 0.25, look: { skin: 0xd8a27c, hair: 0x513524, style: 'short', outfit: 0xd05f47, hat: 'cowboy' } },
+};
+export const CUSTOMER_LIST = Object.keys(CUSTOMERS);

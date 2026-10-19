@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#8ed458" />
+  <meta name="mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="description" content="Farm Family Party — game nông trại cozy 3D cho 2–4 người, chơi mượt trên điện thoại và trình duyệt." />
+  <link rel="manifest" href="./manifest.webmanifest" /><link rel="icon" href="./icon.svg" type="image/svg+xml" /><link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* Critical CSS chống lỗi trắng trang / FOUC trên trình duyệt di động */
+    .hidden{display:none!important}
+    html,body{margin:0;height:100%;overflow:hidden;background:#8ed458;font-family:'Baloo 2',system-ui,-apple-system,sans-serif;color:#4e3b2c;user-select:none;-webkit-user-select:none}
+    #app{position:fixed;inset:0;overflow:hidden}
+    canvas#c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  </style>
+  <link rel="stylesheet" href="./src/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
+      "canvas-confetti": "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/+esm",
+      "peerjs": "https://cdn.jsdelivr.net/npm/peerjs@1.5.5/+esm"
+    }
+  }
+  </script>
+  <title>Farm Family Party</title>
+</head>
+<body>
+  <div id="app">
+    <canvas id="c"></canvas><div id="floats"></div><div id="crosshair"></div><div id="marker" class="hidden">👇</div>
+    <div id="hud" class="hidden"></div><div id="joyFix"><i class="ar u">▲</i><i class="ar d">▼</i><i class="ar l">◀</i><i class="ar r">▶</i><div id="joyFixKnob"></div></div><div id="joy"><div id="joyKnob"></div></div>
+    <div id="toasts"></div><div id="banner" class="banner"></div><div id="chatfeed"></div><div id="fish" class="hidden"></div>
+    <div id="panel" class="panel"></div><div id="menu"></div><div id="fade"></div>
+    <div id="eyelids"><div class="lid top"></div><div class="lid bot"></div></div>
+    <div id="sleep" class="hidden">
+      <div class="sleepCard">
+        <span class="zz">😴</span>
+        <div class="sleepTxt">
+          <b>Đang nằm trên giường êm... Zzz</b>
+          <small id="sleepInfo">Nhân vật đã nhắm mắt nghỉ ngơi trên gối</small>
+        </div>
+        <div class="row">
+          <button class="b go" data-sleep="dream">🌙 Nhắm mắt ngủ qua đêm</button>
+          <button class="b ghost" data-sleep="wake">☀️ Mở mắt dậy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "farm-family-party",
+  "version": "1.0.0",
+  "description": "Farm Family Party — cozy multiplayer farming game (Vite + Three.js + PeerJS + Cloud Save Server)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host --port 3000",
+    "build": "vite build",
+    "start": "node server.mjs",
+    "preview": "vite preview",
+    "test": "node tests/sim.test.mjs",
+    "sync": "node auto-sync.mjs",
+    "watch-sync": "node auto-sync.mjs --watch",
+    "go": "node auto-sync.mjs && npx vite --host"
+  },
+  "dependencies": {
+    "@fontsource/baloo-2": "^5.3.0",
+    "canvas-confetti": "^1.9.4",
+    "peerjs": "^1.5.5",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  }
+}

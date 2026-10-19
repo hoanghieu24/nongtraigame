@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: farm-family-party
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node server.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
