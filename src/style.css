@@ -280,3 +280,53 @@ input[type=text],input:not([type]),#chatIn{flex:1;min-width:0;border:2px solid #
 #rsc2d{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;z-index:28;background:#141d26;display:flex;align-items:center;justify-content:center;padding:0!important;overflow:hidden;touch-action:none}
 #rsc2dCanvas{width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:fill!important;border-radius:0!important;box-shadow:none!important;touch-action:none;cursor:pointer;display:block}
 #app.rsc2d-open #hud,#app.rsc2d-open #joyFix,#app.rsc2d-open #joy,#app.rsc2d-open #marker,#app.rsc2d-open #crosshair,#app.rsc2d-open #cropTimers{display:none!important;pointer-events:none!important}
+
+/* ================= KHU VUI CHƠI ĐÔI & NÚT CHỌN HIẾU - HUYỀN ================= */
+.couplePickRow{display:flex;gap:10px;justify-content:center;margin:6px 0 12px;width:100%}
+.coupleBtn{flex:1;max-width:210px;display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:16px;background:rgba(255,255,255,.94);border:2.5px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.15);text-align:left;transition:transform .12s,border-color .15s}
+.coupleBtn:active{transform:scale(.95)}
+.coupleBtn span{font-size:26px}
+.coupleBtn b{display:block;font-size:14px;line-height:1.1}
+.coupleBtn small{display:block;font-size:11px;color:#6b7280}
+.coupleBtn.hieu.on{border-color:#3b82f6;background:linear-gradient(180deg,#eff6ff,#dbeafe);box-shadow:0 0 14px rgba(59,130,246,.45)}
+.coupleBtn.hieu.on b{color:#1d4ed8}
+.coupleBtn.huyen.on{border-color:#ec4899;background:linear-gradient(180deg,#fdf2f8,#fce7f3);box-shadow:0 0 14px rgba(236,72,153,.45)}
+.coupleBtn.huyen.on b{color:#be185d}
+
+.arcLoveHeader{background:linear-gradient(135deg,rgba(236,72,153,.18),rgba(59,130,246,.18));border:2px solid rgba(255,255,255,.8);border-radius:16px;padding:10px 14px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.arcCoupleAv{display:flex;align-items:center;gap:4px;font-size:16px;font-weight:800}
+.arcCoupleAv i{font-style:normal;font-size:18px;animation:pulseHeart 1.2s infinite}
+@keyframes pulseHeart{50%{transform:scale(1.22)}}
+.arcLoveMeta{flex:1}
+.arcDareBox{background:linear-gradient(180deg,#fff1f2,#ffe4e6);border:2px dashed #f43f5e;border-radius:12px;padding:9px 12px;color:#9f1239;margin:8px 0;font-size:13.5px}
+.arcQuizOpts{display:flex;flex-direction:column;gap:6px}
+.arcOptBtn{text-align:left!important;justify-content:flex-start!important;padding:8px 12px!important;font-size:13px!important;white-space:normal!important}
+
+.arcStatsBar{display:flex;justify-content:space-between;background:rgba(255,255,255,.2);padding:5px 10px;border-radius:10px;margin:8px 0;font-size:13px}
+.arcMoleGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:320px;margin:10px auto}
+.arcMoleHole{aspect-ratio:1;border-radius:16px;background:linear-gradient(180deg,#784c28,#4a2e16);border:2px solid #a36a3b;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;box-shadow:inset 0 4px 8px rgba(0,0,0,.45);transition:transform .08s}
+.arcMoleHole:active{transform:scale(.92)}
+.arcMoleEmoji{font-size:32px;line-height:1}
+.arcMoleHole.up.mole{background:linear-gradient(180deg,#60a5fa,#2563eb);border-color:#93c5fd}
+.arcMoleHole.up.gold{background:linear-gradient(180deg,#fbbf24,#d97706);border-color:#fef08a}
+.arcMoleHole.up.heart{background:linear-gradient(180deg,#f472b6,#db2777);border-color:#fbcfe8}
+.arcMoleHole.up.bomb{background:linear-gradient(180deg,#ef4444,#b91c1c);border-color:#fca5a5}
+
+.arcCatchBoard{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:repeat(5,42px);gap:3px;background:rgba(15,23,42,.35);border:2px solid rgba(255,255,255,.3);border-radius:14px;padding:4px;max-width:340px;margin:8px auto;touch-action:none}
+.arcCatchCell{display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:6px;background:rgba(255,255,255,.05)}
+.arcBasketRow{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;max-width:340px;margin:6px auto}
+.arcBasketBtn{padding:6px 0!important;font-size:12px!important}
+
+.arcMemGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:340px;margin:8px auto}
+.arcMemCard{aspect-ratio:1;border-radius:12px;background:linear-gradient(180deg,#fce7f3,#fbcfe8);border:2px solid #f472b6;font-size:24px;display:grid;place-items:center;box-shadow:0 3px 6px rgba(0,0,0,.15);transition:transform .12s}
+.arcMemCard.open{background:linear-gradient(180deg,#eff6ff,#dbeafe);border-color:#3b82f6;transform:rotateY(180deg)}
+.arcMemCard.done{background:#dcfce7;border-color:#22c55e;opacity:.65;pointer-events:none}
+
+.arcRaceTrack{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.arcRaceLane{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.15);padding:6px 10px;border-radius:12px;border:1.5px solid rgba(255,255,255,.25)}
+.arcRaceLane.win{border-color:#fbbf24;background:rgba(251,191,36,.25)}
+.arcLaneLabel{width:95px;font-size:13px;font-weight:800;white-space:nowrap}
+.arcLaneBar{flex:1;height:24px;background:rgba(0,0,0,.25);border-radius:12px;position:relative;overflow:hidden}
+.arcLaneRunner{position:absolute;top:2px;font-size:18px;transition:left .12s linear}
+.arcLaneFlag{font-size:14px;width:55px;text-align:right}
+

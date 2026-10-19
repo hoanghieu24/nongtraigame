@@ -23,6 +23,7 @@ import { expandCost } from '../farming/FarmingSystem.js';
 import { guide } from './Guide.js';
 import { TOOLS } from '../player/PlayerView.js';
 import { Menu } from './Menu.js';
+import { CoupleArcade } from './CoupleArcade.js';
 import { WEATHER } from '../data/weather.js';
 import { VP } from '../core/Viewport.js';
 
@@ -30,7 +31,7 @@ const $ = (s, r = document) => r.querySelector(s);
 const btn = (a, label, d = '', cls = '') => `<button class="b ${cls}" data-a="${a}" ${d}>${label}</button>`;
 const bar = (p, cls = '') => `<i class="bar ${cls}"><u style="width:${clamp(p, 0, 1) * 100}%"></u></i>`;
 const _projV = new THREE.Vector3();
-const PANEL_TITLES = { daily: '🎁 Điểm Danh & Vòng Quay Mỗi Ngày', emote: '😘 Cảm xúc', pack: '🎒 Túi đồ', shop: '🛒 Cửa hàng', sell: '💰 Bán hàng', quests: '📜 Nhiệm vụ & Năng động', chest: '📦 Rương chung', kitchen: '👨‍🍳 Quán Ăn Làng: Ready, Set, Cook!', house: '🏠 Nâng cấp Nhà & Ruộng', build: '🔨 Xây dựng & Trang trí', settings: '⚙️ Cài đặt & Góc nhìn', chat: '💬 Trò chuyện', dialog: '💬', seeds: '🌱 Chọn hạt giống', room: '🔗 Mời bạn bè' };
+const PANEL_TITLES = { arcade: '🎮 Khu Vui Chơi Đôi: Hiếu ❤️ Huyền', daily: '🎁 Điểm Danh & Vòng Quay Mỗi Ngày', emote: '😘 Cảm xúc', pack: '🎒 Túi đồ', shop: '🛒 Cửa hàng', sell: '💰 Bán hàng', quests: '📜 Nhiệm vụ & Năng động', chest: '📦 Rương chung', kitchen: '👨‍🍳 Quán Ăn Làng: Ready, Set, Cook!', house: '🏠 Nâng cấp Nhà & Ruộng', build: '🔨 Xây dựng & Trang trí', settings: '⚙️ Cài đặt & Góc nhìn', chat: '💬 Trò chuyện', dialog: '💬', seeds: '🌱 Chọn hạt giống', room: '🔗 Mời bạn bè' };
 
 const fmtCarry = (c) => {
   if (!c) return 'Tay trống';
@@ -44,7 +45,7 @@ const fmtCarry = (c) => {
 export class UI {
   constructor() {
     this.panel = null; this.params = {}; this.tab = ''; this.sel = ''; this.filter = 'all'; this.lastHtml = ''; this.toastN = 0; this.floatPool = []; this.chatLog = []; this.guideT = 0; this.cropT = 0; this.cache = {}; this.lastSell = null; this.dialogNpc = null; this.dockCollapsed = false; this.spinning = false;
-    this.root = $('#app'); this.panelEl = $('#panel'); this.floats = $('#floats'); this.menu = new Menu(this); this.fish = new FishGame(this);
+    this.root = $('#app'); this.panelEl = $('#panel'); this.floats = $('#floats'); this.menu = new Menu(this); this.fish = new FishGame(this); this.arcade = new CoupleArcade(this);
     this.panelEl.addEventListener('click', (e) => { const el = e.target.closest('[data-a]'); if (!el || el.disabled) return; if (el.classList.contains('slot') && e.target.closest('.pop')) return; this.act(el.dataset.a, el.dataset, el); });
     this.panelEl.addEventListener('input', (e) => {
       const t = e.target;
@@ -68,7 +69,7 @@ export class UI {
   buildHud() {
     const h = $('#hud'); h.innerHTML = `
     <div id="hudL">
-      <div id="me" class="pill hudCap" data-h="daily" title="Hồ sơ & Điểm danh 7 ngày">
+      <div id="me" class="pill hudCap" data-h="arcade" title="Hồ sơ Hiếu ❤️ Huyền & Khu Vui Chơi Đôi">
         <span id="vAv">🙂</span><b id="vName" class="hidePhone"></b>
         <span class="lvlTag" id="pLvl"><b id="vLvl">Cấp 1</b>${bar(0, 'xp').replace('<i class="bar xp">', '<i class="bar xp" id="vXp">')}</span>
         <small id="vPl" class="hidden"></small><em id="vCoop"></em>
@@ -81,6 +82,7 @@ export class UI {
       </div>
     </div>
     <div id="hudR">
+      <button class="ib giftBtn" data-h="arcade" title="Khu Vui Chơi Đôi Hiếu ❤️ Huyền"><span>🎮</span></button>
       <button class="ib giftBtn" data-h="daily" title="Quà Điểm Danh & Vòng Quay May Mắn"><u id="dDot" class="hidden"></u><span>🎁</span></button>
       <button class="ib" data-h="view" title="Đổi góc nhìn (V)">🎥</button>
       <button class="ib" data-h="zoom" title="Đổi cự ly Camera Gần/Vừa/Xa">🔍</button>
@@ -91,6 +93,7 @@ export class UI {
     </div>
     <div id="hudStatus"><div id="guide" class="pill hidden" data-h="quests"><span id="gIc">📍</span><b id="gTx"></b><i class="chev">›</i></div><div id="alert" class="pill warn hidden"></div><div id="contest" class="pill hidden"></div></div>
     <div id="dock">
+      <button class="ib dk dkGift" data-h="arcade"><span>🎮</span><small>Trò Chơi</small></button>
       <button class="ib dk dkGift" data-h="daily"><u id="dDot2" class="hidden"></u><span>🎁</span><small>Quà</small></button>
       <button class="ib dk" data-h="quests"><u id="qDot" class="hidden"></u><span>📜</span><small>Việc</small></button>
       <button class="ib dk" data-h="pack"><span>🎒</span><small>Túi</small></button>
@@ -136,6 +139,7 @@ export class UI {
       else if (k === 'build') g.toggleBuild();
       else if (k === 'emote') this.toggle('emote');
       else if (k === 'daily') this.toggle('daily');
+      else if (k === 'arcade') this.toggle('arcade');
       else this.toggle(k);
     });
     $('#hotbar').addEventListener('pointerdown', (e) => { const el = e.target.closest('[data-t]'); if (el) { e.preventDefault(); this.buzz(); this.g.setTool(+el.dataset.t); } });
@@ -195,10 +199,13 @@ export class UI {
     $('#app').classList.toggle('building', g.build.on); this.marker();
     this.cropT -= dt;
     if (this.cropT <= 0) {
-      this.cropT = g.input.mobile ? 0.08 : 0.05;
+      this.cropT = 0.25;
       this.updateCropTimers(dt, st, ti);
     }
-    if (this.panel) this.livePanel(dt); this.fish.update(dt); this.updateBuildStat();
+    this.arcade.update(dt);
+    if (this.panel && this.panel !== 'arcade') this.livePanel(dt);
+    this.fish.update(dt);
+    this.updateBuildStat();
   }
 
   // Thanh Đơn Hàng & Công Thức màu xanh bên dưới màn hình theo đúng giao diện "Ready, Set, Cook!" trên Facebook
@@ -270,6 +277,7 @@ export class UI {
       if (el) { el.classList.toggle('hidden', dn === 0); el.textContent = dn; }
     }
   }
+  // Chỉ hiển thị Thanh Tiến Trình + Thời Gian cho cây trồng & tưới nước (tối giản 100% chống lag)
   updateCropTimers(dt, st, ti) {
     const box = $('#cropTimers'); if (!box) return;
     const g = this.g, l = g.local;
@@ -278,20 +286,21 @@ export class UI {
       return;
     }
     const cx = PLOT.x0 + PLOT.sp, cz = PLOT.z0 + (st.farm.plotRows - 1) * PLOT.sp * 0.5;
-    const nearPlots = Math.hypot(l.x - cx, l.z - cz) <= 18;
+    if (Math.hypot(l.x - cx, l.z - cz) > 15) {
+      if (box.childElementCount > 0) box.innerHTML = '';
+      return;
+    }
     const rain = st.world.weather === 'rain' || st.world.weather === 'storm', wt = st.world.t;
-    const maxCropDist = g.input.mobile ? 6.0 : 11.5;
+    const maxCropDist = g.input.mobile ? 6.5 : 10.5;
     const activeIds = [];
-    if (nearPlots) for (const id in st.crops) {
+    for (const id in st.crops) {
       const c = st.crops[id];
       if (!c || !c.crop) continue;
       const p = plotPos(c.r, c.c);
       const d = Math.hypot(p.x - l.x, p.z - l.z);
       const isFocused = l.plot && l.plot.id === id;
       if (d > maxCropDist && !isFocused) continue;
-      // Trên điện thoại chỉ hiện chi tiết ô đang đứng cạnh hoặc cây đã chín / khô cần tưới để không che màn hình
-      if (g.input.mobile && !isFocused && c.s !== 'ripe' && ((c.w > wt) || rain) && d > 3.2) continue;
-      const scr = this.projectXYZ(p.x, isFocused ? 1.3 : 1.0, p.z);
+      const scr = this.projectXYZ(p.x, 0.72, p.z);
       if (!scr || scr.x < 20 || scr.x > VP.vw - 20 || scr.y < 30 || scr.y > VP.vh - 30) continue;
       activeIds.push(id);
       let el = box.querySelector(`[data-cid="${id}"]`);
@@ -301,7 +310,6 @@ export class UI {
         el.dataset.cid = id;
         box.appendChild(el);
       }
-      const def = CROPS[c.crop];
       const wet = (c.w > wt) || rain;
       const pct = Math.min(100, Math.floor((c.g || 0) * 100));
       el.style.transform = `translate3d(${Math.round(scr.x)}px,${Math.round(scr.y)}px,0) translate(-50%,-100%)`;
@@ -310,54 +318,10 @@ export class UI {
       el.classList.toggle('dry', c.s !== 'ripe' && !wet);
       let html;
       if (c.s === 'ripe') {
-        html = g.input.mobile && !isFocused
-          ? `<b>${def.icon} ✨</b>`
-          : `<b>${def.icon} ${def.name}</b><span class="ctEta ripe">✨ Chín!</span>`;
+        html = `<span class="ctEta ripe">✨ Chín!</span><i class="ctBar"><u style="width:100%"></u></i>`;
       } else {
         const eta = fmtEta(cropEtaSec(c, st, ti));
-        html = g.input.mobile && !isFocused
-          ? `<b>${def.icon} ${wet ? pct + '%' : '☀️Tưới'}</b>`
-          : `<b>${def.icon} ${isFocused ? def.name + ' (' + pct + '%)' : ''}</b><span class="ctEta">⏱️ ${eta} ${wet ? '💧' : '☀️Tưới!'}</span><i class="ctBar"><u style="width:${pct}%"></u></i>`;
-      }
-      if (el._last !== html) { el._last = html; el.innerHTML = html; }
-    }
-    for (const pk of ['coop', 'duck']) {
-      const P = PENS[pk], inc = st.buildings[pk]?.inc;
-      if (!P?.inc || !inc) continue;
-      if (Math.hypot(P.inc.x - l.x, P.inc.z - l.z) > (g.input.mobile ? 6.5 : 11)) continue;
-      const cid = 'inc_' + pk, scr = this.projectXYZ(P.inc.x, 1.45, P.inc.z);
-      if (!scr || scr.x < 20 || scr.x > VP.vw - 20 || scr.y < 30 || scr.y > VP.vh - 30) continue;
-      activeIds.push(cid);
-      let el = box.querySelector(`[data-cid="${cid}"]`);
-      if (!el) { el = document.createElement('div'); el.className = 'cropTimer focus'; el.dataset.cid = cid; box.appendChild(el); }
-      const left = Math.max(0, inc.t ?? inc.left ?? 0);
-      const dur = Math.max(1, inc.max || inc.dur || INCUBATE_SECONDS);
-      const pct = clamp(Math.floor((1 - left / dur) * 100), 0, 100);
-      el.style.transform = `translate3d(${Math.round(scr.x)}px,${Math.round(scr.y)}px,0) translate(-50%,-100%)`;
-      const html = `<b>🐣 Ấp trứng (${pct}%)</b><span class="ctEta">⏱️ ${fmtEta(left)}</span><i class="ctBar"><u style="width:${pct}%"></u></i>`;
-      if (el._last !== html) { el._last = html; el.innerHTML = html; }
-    }
-    for (const id in st.animals) {
-      const a = st.animals[id];
-      if (!a || a.area === 'house') continue;
-      const isBaby = (a.growth ?? 1) < 0.85;
-      const isBrood = a.sub === 'incubate';
-      if (!isBaby && !isBrood) continue;
-      if (Math.hypot(a.x - l.x, a.z - l.z) > (g.input.mobile ? 5.5 : 9)) continue;
-      const cid = 'ani_' + id, scr = this.projectXYZ(a.x, isBaby ? 0.95 : 1.25, a.z);
-      if (!scr || scr.x < 20 || scr.x > VP.vw - 20 || scr.y < 30 || scr.y > VP.vh - 30) continue;
-      activeIds.push(cid);
-      let el = box.querySelector(`[data-cid="${cid}"]`);
-      if (!el) { el = document.createElement('div'); el.className = 'cropTimer'; el.dataset.cid = cid; box.appendChild(el); }
-      el.style.transform = `translate3d(${Math.round(scr.x)}px,${Math.round(scr.y)}px,0) translate(-50%,-100%)`;
-      let html;
-      if (isBrood) {
-        const subLeft = Math.max(0, a.subT || 0);
-        const pct = clamp(Math.floor((1 - subLeft / INCUBATE_SECONDS) * 100), 0, 100);
-        html = `<b>🐔 ${esc(a.name)} ấp</b><span class="ctEta">🐣 ${fmtEta(subLeft)}</span><i class="ctBar"><u style="width:${pct}%"></u></i>`;
-      } else {
-        const pct = Math.min(100, Math.round(((a.growth - 0.36) / (0.85 - 0.36)) * 100));
-        html = `<b>🐣 ${esc(a.name)}</b><span class="ctEta">🌱 ${clamp(pct, 1, 99)}%</span>`;
+        html = `<span class="ctEta">⏱️ ${eta} ${wet ? '💧' : '☀️'}</span><i class="ctBar"><u style="width:${pct}%"></u></i>`;
       }
       if (el._last !== html) { el._last = html; el.innerHTML = html; }
     }
@@ -474,11 +438,39 @@ export class UI {
         }, 65);
         return;
       }
+      case 'switchChar': {
+        const who = d.who;
+        const newName = who === 'huyen' ? 'Huyền' : 'Hiếu';
+        const preset = who === 'huyen' ? 1 : 0;
+        const p = g.save.profile() || {};
+        p.name = newName;
+        p.preset = preset;
+        g.save.saveProfile(p);
+        if (me) {
+          me.name = newName;
+          me.char = { preset, hat: who === 'huyen' ? 'flower' : 'cap' };
+          g.store.state.players[me.id].name = newName;
+          g.store.state.players[me.id].char = me.char;
+          g.store.touch('players.' + me.id);
+        }
+        this.toast(`Đã đổi nhân vật thành ${newName} ${who === 'huyen' ? '💖' : '💙'}!`, 'good');
+        this.render(true);
+        return;
+      }
       case 'openDaily': this.open('daily'); return;
       case 'openQuests': this.open('quests'); return;
+      case 'openArcade': this.open('arcade'); return;
       case 'talk': this.dialogLine = null; this.render(true); break;
+      default:
+        if (a && a.startsWith('arc')) {
+          if (this.arcade.act(a, d)) return;
+        }
+        break;
     }
     setTimeout(() => this.render(true), 90);
+  }
+  p_arcade(st, me) {
+    return this.arcade.render(st, me);
   }
   // ---------------- nội dung panel ----------------
   p_pack(st, me) {
@@ -799,6 +791,8 @@ export class UI {
     h += `<label class="sl"><span>Độ mượt khi xoay (Quán tính)</span><input type="range" min="10" max="100" value="${smooth}" data-cam="smooth"><b id="lbl_smooth">${smooth}%</b></label>`;
     h += `<h4>✨ Chất lượng Đồ hoạ (Đã tối ưu chống giật Điện Thoại)</h4>${seg('gfx', S.gfx, [['auto', `Tự động (${g.gfx.level})`], ['low', 'Siêu Mượt (Máy yếu)'], ['medium', 'Chuẩn 60 FPS'], ['high', 'Siêu Nét HD']])}`;
     h += `<h4>🔊 Âm thanh</h4>${[['master', 'Tổng'], ['music', 'Nhạc'], ['sfx', 'Hiệu ứng']].map(([k, n]) => `<label class="sl"><span>${n}</span><input type="range" min="0" max="100" value="${Math.round(S[k] * 100)}" data-vol="${k}"></label>`).join('')}`;
+    h += `<h4>👤 Đổi Nhân Vật Nhanh (Hiếu 💙 / Huyền 💖)</h4>`;
+    h += `<div class="row wrap">${btn('switchChar', '👦 Đổi thành Hiếu 💙', 'data-who="hieu"', me.name === 'Hiếu' ? 'go' : '')}${btn('switchChar', '👧 Đổi thành Huyền 💖', 'data-who="huyen"', me.name === 'Huyền' ? 'go' : '')}</div>`;
     h += `<h4>🔗 Mời bạn bè chơi cùng (2 Máy / 2 Địa Điểm)</h4><div class="room"><b class="code">${code}</b>${btn('copy', '📋 Chép mã', '', 'sm')}${btn('copylink', '🔗 Chép Link Mời', '', 'sm go')}</div><small class="hint">Đang chơi: ${online.map((p) => esc(p.name)).join(', ')} • Tự động đồng bộ Cloud ☁️</small>`;
     h += `<div class="row wrap">${btn('savenow', '☁️ Lưu Cloud ngay', '', 'sm go')}${btn('exportjson', '💾 Tải File Backup (.json)', '', 'sm')}${btn('full', '⛶ Toàn màn hình', '', 'sm ghost')}${btn('menu', '🏠 Về menu', '', 'sm ghost')}</div>`;
     if (ses.role === 'host') h += `<h4>🎲 Thử sự kiện (chủ farm)</h4><div class="chips">${Object.entries(EVENTS).map(([k, e]) => `<button class="b sm ghost" data-a="dev" data-t="${k}">${e.icon} ${e.name}</button>`).join('')}</div>`;

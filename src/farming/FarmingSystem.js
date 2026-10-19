@@ -30,7 +30,7 @@ export class FarmingSystem {
     if (c) return fail('Ô này cuốc rồi!');
     this.sim.st.crops[plot] = { id: plot, r: pp.r, c: pp.c, s: 'tilled', w: 0, by: [pid] };
     this.sim.touch('crops.' + plot);
-    this.sim.fx({ k: 'burst', kind: 'dirt', x: pos.x, z: pos.z, y: 0.3, n: 10 }); this.sim.fx({ k: 'sfx', name: 'till', x: pos.x, z: pos.z });
+    this.sim.fx({ k: 'sfx', name: 'till', x: pos.x, z: pos.z });
     this.sim.sys('prog').addXp(pid, 1); this.sim.game({ type: 'till', pid, plot });
     return ok();
   }
@@ -41,7 +41,7 @@ export class FarmingSystem {
     if (c.w > t + CFG.WATER_SECONDS * 0.6) return fail('Đất còn ướt mà!');
     c.w = t + CFG.WATER_SECONDS; this.mark(c, pid); this.stat(pid, 'water');
     this.sim.touch('crops.' + plot);
-    this.sim.fx({ k: 'burst', kind: 'water', x: pos.x, z: pos.z, y: 1.1, n: 12 }); this.sim.fx({ k: 'sfx', name: 'water', x: pos.x, z: pos.z });
+    this.sim.fx({ k: 'sfx', name: 'water', x: pos.x, z: pos.z });
     this.sim.sys('prog').addXp(pid, 1); this.sim.game({ type: 'water', pid, plot, n: 1 });
     return ok();
   }
@@ -57,7 +57,7 @@ export class FarmingSystem {
     c.s = 'planted'; c.crop = crop; c.g = 0; this.mark(c, pid); this.stat(pid, 'plant');
     if (st.meta.tut <= 3) c.fast = 1;                      // cây đầu tiên lớn nhanh cho phần hướng dẫn
     sim.touch('crops.' + plot);
-    sim.fx({ k: 'burst', kind: 'dirt', x: pos.x, z: pos.z, y: 0.4, n: 6 }); sim.fx({ k: 'sfx', name: 'plant', x: pos.x, z: pos.z });
+    sim.fx({ k: 'sfx', name: 'plant', x: pos.x, z: pos.z });
     sim.sys('prog').addXp(pid, 1); sim.game({ type: 'plant', pid, plot, crop, n: 1 });
     return ok();
   }
@@ -70,10 +70,10 @@ export class FarmingSystem {
     if (def.regrow) { c.s = 'planted'; c.g = 0.45; } else { c.s = 'tilled'; delete c.crop; c.g = 0; delete c.fast; }
     c.by = [];
     sim.touch('crops.' + plot);
-    sim.fx({ k: 'burst', kind: 'dirt', x: pos.x, z: pos.z, y: 0.5, n: 14 }); sim.fx({ k: 'sfx', name: 'harvest', x: pos.x, z: pos.z });
+    sim.fx({ k: 'sfx', name: 'harvest', x: pos.x, z: pos.z });
     sim.fx({ k: 'float', x: pos.x, z: pos.z, y: 1.8, text: `+${qty} ${def.icon}`, color: '#fff', to: pid });
-    if (team) { sim.fx({ k: 'float', x: pos.x, z: pos.z, y: 2.6, text: '🤝 Teamwork +1!', color: '#ffd166' }); sim.fx({ k: 'burst', kind: 'stars', x: pos.x, z: pos.z, y: 1.4, n: 10 }); }
-    else if (lucky) sim.fx({ k: 'float', x: pos.x, z: pos.z, y: 2.6, text: '🍀 May mắn +1!', color: '#9be26b' });
+    if (team) { sim.fx({ k: 'float', x: pos.x, z: pos.z, y: 2.6, text: '🤝 Teamwork +1!', color: '#ffd166' }); }
+    else if (lucky) { sim.fx({ k: 'float', x: pos.x, z: pos.z, y: 2.6, text: '🍀 May mắn +1!', color: '#9be26b' }); }
     sim.sys('prog').addXp(pid, def.xp * qty);
     sim.game({ type: 'harvest', pid, plot, item: cropId, n: qty, team });
     return ok();
@@ -104,9 +104,9 @@ export class FarmingSystem {
       const g0 = c.g; c.g = Math.min(1, c.g + dt * rate);
       if (c.g >= 1) {
         c.s = 'ripe'; sim.touch('crops.' + id);
-        const p = plotPos(c.r, c.c); sim.fx({ k: 'burst', kind: 'sparkle', x: p.x, z: p.z, y: 0.8, n: 8 }); sim.fx({ k: 'sfx', name: 'ripe', x: p.x, z: p.z });
+        sim.fx({ k: 'sfx', name: 'ripe' });
         sim.game({ type: 'ripe', plot: id });
-      } else if (Math.floor(c.g * 50) !== Math.floor(g0 * 50)) sim.touch('crops.' + id);
+      } else if (Math.floor(c.g * 12) !== Math.floor(g0 * 12)) sim.touch('crops.' + id);
     }
   }
 }

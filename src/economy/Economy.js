@@ -8,7 +8,54 @@ import { takeFrom } from '../inventory/Inventory.js';
 export class EconomySystem {
   constructor(sim) {
     this.sim = sim; this.id = 'economy';
-    this.cmds = { sell: (p, c) => this.sell(p, c), donate: (p, c) => this.donate(p, c) };
+    this.cmds = {
+      sell: (p, c) => this.sell(p, c),
+      donate: (p, c) => this.donate(p, c),
+      arcadeReward: (p, c) => this.arcadeReward(p, c),
+      sendLoveGift: (p, c) => this.sendLoveGift(p, c),
+    };
+  }
+  arcadeReward(pid, { coins = 0, xp = 8, love = 10, label = 'Trò chơi đôi' } = {}) {
+    const st = this.sim.st, p = st.players[pid];
+    if (!p) return fail('Không tìm thấy người chơi');
+    const c = Math.max(0, Math.min(1200, Math.round(coins)));
+    if (c > 0) this.earn(pid, c, { bonus: true });
+    st.economy.loveXp = (st.economy.loveXp || 0) + Math.max(0, love);
+    this.sim.touch('economy');
+    this.sim.sys('prog')?.addXp(pid, Math.max(2, xp));
+    this.sim.fx({ k: 'sfx', name: 'coin' });
+    this.sim.toast(
+      undefined,
+      `🎮 ${p.name} vừa chơi "${label}" nhận +${c} 🪙 & +${love} 💕 Tình Yêu!`,
+      'good'
+    );
+    return ok({ coins: c, love: st.economy.loveXp });
+  }
+  sendLoveGift(pid, { msg = 'Gửi ngàn trái tim tới người ấy! 💖', love = 20, giftCoins = 100 } = {}) {
+    const st = this.sim.st, p = st.players[pid];
+    if (!p) return fail('Không tìm thấy người chơi');
+    st.economy.loveXp = (st.economy.loveXp || 0) + love;
+    st.economy.fund = (st.economy.fund || 0) + giftCoins;
+    for (const pl of Object.values(st.players)) {
+      if (pl.id !== pid) {
+        pl.money = (pl.money || 0) + giftCoins;
+        this.sim.touch('players.' + pl.id);
+      }
+    }
+    this.sim.touch('economy');
+    const pose = this.sim.poses?.[pid];
+    if (pose) {
+      this.sim.fx({ k: 'burst', kind: 'hearts', x: pose.x, z: pose.z, y: 2.6, n: 12 });
+    }
+    this.sim.fx({ k: 'confetti' });
+    this.sim.fx({ k: 'sfx', name: 'levelup' });
+    this.sim.fx({
+      k: 'banner',
+      text: `💖 ${p.name}: "${msg}"`,
+      sub: `+${love} 💕 Điểm Tình Yêu • +${giftCoins} 🪙 vào Quỹ Chung Hiếu & Huyền!`,
+      tone: 'good',
+    });
+    return ok();
   }
   canPay(pid, cost, mode = 'self') { const st = this.sim.st; return (mode === 'fund' ? st.economy.fund : 0) + st.players[pid].money >= cost; }
   // mode 'fund': dùng Quỹ Chung trước, thiếu thì lấy ví cá nhân. Trả về null nếu không đủ.
