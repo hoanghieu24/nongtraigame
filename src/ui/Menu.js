@@ -65,12 +65,12 @@ export class Menu {
   render(screen) {
     this.screen = screen; const F = this.farms, g = this.g, last = F[0]; let h = '';
     if (screen === 'main') {
-      h = `<div class="title"><span class="tl1">HIẾU ❤️ HUYỀN</span><span class="tl2">FARM FAMILY PARTY</span><small>✨ 3D Cận Cảnh HD • 🍕 Quán Pizza & Trà Sữa • 🎮 Khu Trò Chơi Đôi</small><div class="menuDailyTag">👦 Hiếu 💙 & 👧 Huyền 💖 • 🎁 Điểm Danh • 🎡 Vòng Quay Tình Yêu</div></div>
-      ${this.coupleSwitchHtml()}
+      h = `<div class="menuHero"><div class="title"><span class="tl1">HIẾU ❤️ HUYỀN</span><span class="tl2">FARM FAMILY PARTY</span><small>✨ 3D Cận Cảnh HD • 🍕 Quán Pizza & Trà Sữa • 🎮 Khu Trò Chơi Đôi</small><div class="menuDailyTag">👦 Hiếu 💙 & 👧 Huyền 💖 • 🎁 Điểm Danh • 🎡 Vòng Quay Tình Yêu</div></div>
+      ${this.coupleSwitchHtml()}</div>
       <div class="mbtns">
         <button class="mb primary" data-m="${last ? 'resume' : 'create'}" data-code="${last?.code || ''}">${last ? `▶ TIẾP TỤC CHƠI (${esc(this.profile.name)})` : `▶ BẮT ĐẦU CHƠI (${esc(this.profile.name)})`}<small>${last ? `${esc(last.name)} • Ngày ${last.day} • Mã phòng: ${last.code} ☁️` : 'Vào Nông Trại Hiếu & Huyền 💕 ngay!'}</small></button>
         <button class="mb rscSpecial" data-m="playArcade">🎮 KHU VUI CHƠI HIẾU ❤️ HUYỀN<small>Đập Chuột • Hứng Dâu • Lật Thẻ Đôi • Đua Thú • Bắn Tim</small></button>
-        <button class="mb rscSpecial" data-m="playRsc" style="background:linear-gradient(135deg,#f59e0b,#ea580c)">🍕 VÀO NGAY QUÁN ĂN 2.5D<small>Ready, Set, Cook! • 4 Bát Rửa • Chữa Cháy • 3 Phase</small></button>
+        <button class="mb rscSpecial restaurantEntry" data-m="playRsc">🍕 VÀO NGAY QUÁN ĂN 2.5D<small>Ready, Set, Cook! • 3 giai đoạn • Chơi chung 2 người</small></button>
         <div class="mGrid">
           <button class="mb smBtn" data-m="create">🌱 Tạo Farm</button>
           <button class="mb smBtn" data-m="join">👫 Vào Bạn Bè</button>

@@ -1035,7 +1035,7 @@ export class DifficultyDirector {
     this.bakingOvenUnlocked = false;
     this.announcementBanner = {
       text: '🥗 PHASE 1 (0s-60s): EASY MODE — Món đơn giản 1 nguyên liệu (Cà Chua Thái)!',
-      subText: 'Tốc độ khách: 25s/đơn • Kiên nhẫn: Chậm • Bấm [🚀 LÊN PHASE] nếu muốn mở Pizza ngay!',
+      subText: 'Tốc độ khách: 25s/đơn • Kiên nhẫn: Chậm • Phục vụ để mở thực đơn mới!',
       color: '#69f0ae',
       timer: 5.5,
     };
@@ -1045,23 +1045,12 @@ export class DifficultyDirector {
    * Update match timer and check phase transitions (0-60s, 61-120s, 121-180s)
    */
   update(dt) {
+    if (this.host.matchOver) return;
     this.elapsed += dt;
     if (this.elapsed >= this.matchDuration) {
-      // Celebrate completing the 180s shift and start a new 180s cycle while keeping Phase 3 unlocked
-      this.shiftsCompleted = (this.shiftsCompleted || 0) + 1;
-      this.elapsed = this.elapsed % this.matchDuration;
-      this.host.rewardCoins?.(
-        200,
-        640,
-        195,
-        `🏆 HOÀN THÀNH CA TRỰC 180s (#${this.shiftsCompleted})! THƯỞNG +200 🪙!`
-      );
-      this.announcementBanner = {
-        text: `🏆 HOÀN THÀNH CA TRỰC #${this.shiftsCompleted}! THƯỞNG NÓNG +200 🪙!`,
-        subText: 'Tiếp tục hiệp mới với toàn bộ thực đơn Phase 3 (Pizza + Caprese + Salad + Trà Sữa)!',
-        color: '#ffe066',
-        timer: 6.0,
-      };
+      this.elapsed = this.matchDuration;
+      this.host.finishShift?.();
+      return;
     }
 
     if (this.announcementBanner.timer > 0) {
@@ -1083,23 +1072,6 @@ export class DifficultyDirector {
       this.enterPhase2(true);
     } else if (this.phase === 2 && currentScore >= 650) {
       this.enterPhase3(true);
-    }
-  }
-
-  /**
-   * Manual cycle/advance button on HUD so player can test or jump to Phase 2 / Phase 3 anytime
-   */
-  advancePhaseManually() {
-    if (this.phase === 1) {
-      this.elapsed = Math.max(this.elapsed, 61);
-      this.enterPhase2(false);
-    } else if (this.phase === 2) {
-      this.elapsed = Math.max(this.elapsed, 121);
-      this.enterPhase3(false);
-    } else {
-      // Reset back to Phase 1 if already at Phase 3 and clicked again
-      this.reset();
-      this.host.timer = KITCHEN_TIMINGS.MATCH_SECONDS;
     }
   }
 

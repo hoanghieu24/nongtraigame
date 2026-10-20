@@ -194,6 +194,8 @@ input[type=text],input:not([type]),#chatIn{flex:1;min-width:0;border:2px solid #
 .menuDailyTag{margin:6px auto 0;font-size:12.5px;color:#fff;background:linear-gradient(90deg,#e65c00,#f9a825);border:2px solid #fff8e1;border-radius:99px;padding:3px 14px;display:table;font-weight:800;box-shadow:0 4px 12px rgba(230,92,0,.35);text-shadow:0 1px 2px rgba(0,0,0,.3)}
 @keyframes wob{50%{transform:rotate(-1.5deg) scale(1.02)}}
 .mbtns{display:flex;flex-direction:column;gap:8px;width:min(360px,92%)}.mb{background:linear-gradient(180deg,#ffffff,#f7ead5);border-radius:18px;padding:9px 14px;font-size:17px;font-weight:800;border:2px solid #fff;box-shadow:0 4px 0 #d5bd98,var(--shadow);text-align:center;transition:transform .12s}.mb small{display:block;font-size:11.5px;color:var(--ink2);font-weight:700}.mb.primary{background:linear-gradient(180deg,#70db56,#47ad33);color:#fff;box-shadow:0 5px 0 #2e7a1e,var(--shadow);font-size:21px;border:2.5px solid rgba(255,255,255,.92);padding:10px 16px}.mb.primary small{color:#eaffdf}.mb.rscSpecial{background:linear-gradient(180deg,#ff9f43,#e66712);color:#fff;box-shadow:0 4px 0 #a84300,var(--shadow);border:2.5px solid #fff3d1;font-size:18px;padding:9px 14px}.mb.rscSpecial small{color:#fff5d6}.mb.ghost{background:rgba(255,255,255,.82)}.mb:active{transform:translateY(3px)}
+.mb.restaurantEntry{background:linear-gradient(135deg,#f59e0b,#ea580c)}
+.menuHero{display:flex;flex-direction:column;align-items:center;gap:4px;width:min(490px,94%)}
 .mGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:2px}
 .mb.smBtn{font-size:14.5px;padding:8px 10px;border-radius:15px}
 .mcard{background:var(--cream);border:3px solid #fff;border-radius:26px;padding:16px 18px;width:min(490px,94%);box-shadow:0 8px 30px rgba(60,40,20,.35);max-height:94%;overflow:auto}.mcard h2{margin:0 0 6px}.mcard label{display:block;margin:8px 0 3px;font-size:14px;color:var(--ink2)}.mcard input.code{font-size:26px;letter-spacing:5px;text-align:center;text-transform:uppercase}.mcard .row{margin-top:12px}.mcard .mb{font-size:18px;padding:9px 16px}
@@ -238,7 +240,27 @@ input[type=text],input:not([type]),#chatIn{flex:1;min-width:0;border:2px solid #
 .phone .banner{top:8%;padding:4px 12px;border-radius:14px;border-width:2px;max-width:46%}.phone .banner b{font-size:13px;line-height:1.15}.phone .banner small{font-size:10px}
 .phone .toast{font-size:10.5px;padding:2.5px 8px;border-radius:10px}.phone #chatfeed{bottom:calc(var(--sab) + 122px);max-width:30%}
 .phone .float{font-size:13.5px}
-.phone #menu{flex-direction:row;gap:20px}.phone .tl1{font-size:32px}.phone .tl2{font-size:32px}.phone .menuDailyTag{font-size:10.5px;padding:2px 10px}.phone .mbtns{width:300px;gap:6px}.phone .mb{padding:7px 12px;font-size:15px}.phone .mb.primary{font-size:17.5px;padding:8px 12px}.phone .mb.rscSpecial{font-size:15.5px;padding:7px 12px}.phone .mb.smBtn{font-size:12.5px;padding:6px 8px}.phone .mcard{max-height:96%}
+.phone #menu[data-screen="main"]{display:grid;grid-template-columns:minmax(0,.96fr) minmax(0,1.04fr);align-content:safe center;justify-content:safe center;gap:10px clamp(10px,2vw,22px);padding:max(8px,var(--sat)) max(12px,var(--sar)) max(8px,var(--sab)) max(12px,var(--sal));overflow:auto}
+.phone #menu[data-screen="main"] .menuHero{width:100%;min-width:0;gap:7px}
+.phone #menu[data-screen="main"] .title{width:100%}
+.phone .tl1,.phone .tl2{font-size:clamp(23px,4vw,32px);letter-spacing:2px;-webkit-text-stroke-width:2px}
+.phone .title small{font-size:10px;line-height:1.2;padding:3px 8px}
+.phone .menuDailyTag{font-size:10px;line-height:1.15;padding:3px 8px;white-space:normal}
+.phone .couplePickRow{gap:6px;margin:0}
+.phone .coupleBtn{max-width:none;min-width:0;gap:5px;padding:6px;border-width:2px;border-radius:12px}
+.phone .coupleBtn span{font-size:20px}
+.phone .coupleBtn b{font-size:10.5px}
+.phone .coupleBtn small{font-size:9px;line-height:1.1}
+.phone #menu[data-screen="main"] .mbtns{width:100%;max-width:440px;gap:5px}
+.phone #menu[data-screen="main"] .mb{min-height:42px;padding:5px 8px;font-size:13px;line-height:1.1;border-radius:13px}
+.phone #menu[data-screen="main"] .mb small{font-size:9.5px;line-height:1.1;margin-top:2px}
+.phone #menu[data-screen="main"] .mb.primary{min-height:48px;font-size:15px;padding:6px 8px}
+.phone #menu[data-screen="main"] .mb.rscSpecial{font-size:13.5px}
+.phone #menu[data-screen="main"] .mb.smBtn{min-height:38px;font-size:11.5px;padding:5px 6px}
+.phone #menu[data-screen="main"] .mGrid{gap:5px;margin-top:0}
+.phone .mcard{max-height:96%}
+@media (max-height:370px){.phone #menu[data-screen="main"]{gap:6px 10px;padding-top:max(6px,var(--sat));padding-bottom:max(6px,var(--sab))}.phone #menu[data-screen="main"] .menuHero{gap:4px}.phone .title small{display:none}.phone .coupleBtn{padding:4px}.phone #menu[data-screen="main"] .mb{min-height:36px;padding:4px 6px}.phone #menu[data-screen="main"] .mb.primary{min-height:42px}.phone #menu[data-screen="main"] .mb.smBtn{min-height:34px}}
+.phone #menu.hidden{display:none}
 .phone .slot{font-size:20px}
 .phone .chestRow{grid-template-columns:1fr}
 

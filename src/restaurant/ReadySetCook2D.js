@@ -131,7 +131,7 @@ export class ReadySetCook2D {
     this.g = game;
     this.active = false;
     this.showTip = false;
-    this.helperOn = true; // Mèo Đầu Bếp Mimi phụ việc tự động (có thể bật/tắt 1 chạm)
+    this.helperOn = false; // Hỗ trợ tự nhận đơn là tuỳ chọn; hai người phối hợp theo lượt mặc định.
     this.t = 0;
     this.timer = KITCHEN_TIMINGS.MATCH_SECONDS; // 180s chuẩn 3 Phase (0-60s, 61-120s, 121-180s)
     this.earned = 0;
@@ -170,6 +170,7 @@ export class ReadySetCook2D {
     this.difficultyDirector = new DifficultyDirector(this);
 
     this.buildNavGrid();
+    this.buildFloorCache();
     this.buildDom();
     this.resetState();
   }
@@ -540,7 +541,21 @@ export class ReadySetCook2D {
   resetState() {
     this.difficultyDirector?.reset();
     this.timer = KITCHEN_TIMINGS.MATCH_SECONDS; // 180 giây chuẩn 3 Phase
+    this.matchOver = false;
+    this.earned = 0;
+    this.served = 0;
+    this.combo = 0;
+    this.starsReached = 0;
     this.feverT = 0;
+    this.floats.length = 0;
+    this.particles.length = 0;
+    this.tapRipples.length = 0;
+    if (this.playerController) this.playerController.activeHoldAction = null;
+    this.touchJoy.active = false;
+    this.touchJoy.dragging = false;
+    this.touchJoy.dx = 0;
+    this.touchJoy.dy = 0;
+    this.g.input?.resetTouch?.();
     this.maxPlates = MAX_PLATES; // Chuẩn 4 bát/đĩa trong toàn nhà hàng
     this.cleanPlateStack = 2;    // 2 bát sạch trên kệ + 2 bát sạch đặt sẵn trên 2 quầy ghép = 4 bát
     this.boards = [
@@ -788,6 +803,20 @@ export class ReadySetCook2D {
     }
   }
 
+  finishShift() {
+    if (this.matchOver) return;
+    this.matchOver = true;
+    this.timer = 0;
+    this.rewardCoins(200, 640, 195, '🏆 Hết ca! Thưởng hoàn thành +200 🪙');
+    this.g.audio.sfx('levelup');
+    if (this.isHost) this.broadcastState();
+  }
+
+  restartShift() {
+    this.resetState();
+    this.broadcastState();
+  }
+
   addFloat(x, y, text, color = '#ffe066') {
     this.floats.push({ x, y, text, color, life: 1.6, maxLife: 1.6 });
     if (this.isHost && this.g?.session?.role === 'host') {
@@ -803,6 +832,18 @@ export class ReadySetCook2D {
       combo: this.combo,
       feverT: this.feverT,
       starsReached: this.starsReached,
+      matchOver: this.matchOver,
+      helperOn: this.helperOn,
+      director: {
+        elapsed: this.difficultyDirector?.elapsed || 0,
+        phase: this.difficultyDirector?.phase || 1,
+        orderSpawnInterval: this.difficultyDirector?.orderSpawnInterval || 25,
+        patienceDecayMultiplier: this.difficultyDirector?.patienceDecayMultiplier || 1,
+        unlockedRecipes: this.difficultyDirector?.unlockedRecipes || ['tomato_salad', 'soda'],
+        cheeseSpawnerUnlocked: !!this.difficultyDirector?.cheeseSpawnerUnlocked,
+        bakingOvenUnlocked: !!this.difficultyDirector?.bakingOvenUnlocked,
+        announcementBanner: this.difficultyDirector?.announcementBanner || null,
+      },
       cleanPlateStack: this.cleanPlateStack,
       boards: this.boards,
       plates: this.plates,
@@ -829,9 +870,7 @@ export class ReadySetCook2D {
             }
           : null,
       })),
-      guests: this.guests
-        .filter((g) => g.phase === 'walk_in' || g.phase === 'walk_out')
-        .map((g) => ({
+      guests: this.guests.map((g) => ({
           id: g.id,
           kind: g.kind,
           styleIdx: g.styleIdx,
@@ -841,6 +880,8 @@ export class ReadySetCook2D {
           maxPatience: g.maxPatience,
           x: g.x,
           y: g.y,
+          tableId: g.tableId,
+          path: g.path || [],
           targetTable: g.targetTable,
         })),
       chef0: {
@@ -852,7 +893,15 @@ export class ReadySetCook2D {
         hold: this.chefs[0]?.hold || null,
         chopT: this.chefs[0]?.chopT || 0,
       },
-      chef1Hold: this.chefs[1]?.hold || null,
+      chef1: {
+        x: Math.round(this.chefs[1]?.x || 620),
+        y: Math.round(this.chefs[1]?.y || 525),
+        vx: Math.round(this.chefs[1]?.vx || 0),
+        vy: Math.round(this.chefs[1]?.vy || 0),
+        dir: Math.round((this.chefs[1]?.dir || 0) * 100) / 100,
+        hold: this.chefs[1]?.hold || null,
+        chopT: this.chefs[1]?.chopT || 0,
+      },
     };
   }
 
@@ -864,6 +913,11 @@ export class ReadySetCook2D {
     this.combo = st.combo;
     this.feverT = st.feverT;
     this.starsReached = st.starsReached;
+    this.matchOver = !!st.matchOver;
+    if (st.helperOn !== undefined) this.helperOn = !!st.helperOn;
+    if (st.director && this.difficultyDirector) {
+      Object.assign(this.difficultyDirector, st.director);
+    }
     this.cleanPlateStack = st.cleanPlateStack;
     if (st.boards) this.boards = st.boards;
     if (st.plates) this.plates = st.plates;
@@ -908,7 +962,9 @@ export class ReadySetCook2D {
       this.chefs[0].chopT = st.chef0.chopT;
     }
 
-    if (st.chef1Hold !== undefined && this.chefs[1]) {
+    if (st.chef1 && this.chefs[1]) {
+      Object.assign(this.chefs[1], st.chef1);
+    } else if (st.chef1Hold !== undefined && this.chefs[1]) {
       this.chefs[1].hold = st.chef1Hold;
     }
   }
@@ -946,6 +1002,10 @@ export class ReadySetCook2D {
         const tb = this.tables.find((t) => t.id === msg.tableId);
         this.interactAt(this.chefs[1], st, tb);
       }
+    } else if (msg.kind === 'helper_toggle') {
+      if (this.isHost) this.helperOn = !!msg.on;
+    } else if (msg.kind === 'result_action') {
+      if (this.isHost && msg.action === 'restart' && this.matchOver) this.restartShift();
     } else if (msg.kind === 'client_tap') {
       if (this.isHost && this.chefs[1]) {
         const st = STATIONS[msg.stationId];
@@ -1040,6 +1100,21 @@ export class ReadySetCook2D {
   onCanvasTap(sx, sy) {
     const me = this.myChef;
 
+    if (this.matchOver) {
+      if (sy >= 438 && sy <= 548 && sx >= 420 && sx <= 640) {
+        this.g.audio.sfx('click');
+        if (!this.isHost && this.g.session?.role === 'client') {
+          this.g.session.sendRsc({ kind: 'result_action', action: 'restart' });
+        } else {
+          this.restartShift();
+        }
+      } else if (sy >= 438 && sy <= 548 && sx > 640 && sx <= 860) {
+        this.g.audio.sfx('click');
+        this.close();
+      }
+      return;
+    }
+
     // 1. Nút ✕ góc trên phải hoặc nút Pause || -> Thoát ra Làng!
     if ((sx > 1145 && sy < 95) || (sx > 1050 && sx < 1140 && sy > 32 && sy < 110)) {
       this.g.audio.sfx('click');
@@ -1053,17 +1128,16 @@ export class ReadySetCook2D {
       this.addFloat(340, 95, this.showTip ? '💡 Đã bật nhãn tên trên các trạm bếp!' : '💡 Đã ẩn nhãn tên trạm bếp', '#82cfff');
       return;
     }
-    // 2b. Nút [🚀 PHASE 1/2/3] (sx: 775..898, sy: 38..96) -> Chuyển nhanh sang Rush Hour / Level Up Mở Khoá Pizza!
-    if (sx >= 775 && sx <= 898 && sy >= 38 && sy <= 96) {
-      this.g.audio.sfx('click');
-      this.difficultyDirector?.advancePhaseManually();
-      return;
-    }
     // 3. Nút ? góc trên trái hoặc nút [🐱 Mimi] -> Bật/tắt Mèo Phụ Bếp Mimi
     if ((sx > 162 && sx < 245 && sy > 32 && sy < 110) || (sx >= 900 && sx <= 1042 && sy >= 38 && sy <= 96)) {
       this.g.audio.sfx('click');
-      this.helperOn = !this.helperOn;
-      this.addFloat(640, 125, this.helperOn ? '🐱 Đã bật Mèo Phụ Bếp Mimi hỗ trợ nhận order & gom bát bẩn!' : '🐱 Đã tạm nghỉ Mèo Phụ Bếp Mimi', '#ffe066');
+      const next = !this.helperOn;
+      if (!this.isHost && this.g.session?.role === 'client') {
+        this.g.session.sendRsc({ kind: 'helper_toggle', on: next });
+      } else {
+        this.helperOn = next;
+      }
+      this.addFloat(640, 125, this.helperOn ? '🐱 Mimi sẽ tự nhận đơn mới giúp hai đầu bếp!' : '🐱 Mimi đã tạm nghỉ', '#ffe066');
       return;
     }
     // 3b. Chạm vào Phiếu Order (Order Tickets) ở thanh trên cùng -> Tự động làm ngay món trên phiếu đó!
@@ -1399,6 +1473,12 @@ export class ReadySetCook2D {
       this.starsReached++;
       const bonus = this.starsReached * 80;
       this.earned += bonus;
+      if (sim) {
+        for (const p of sim.connected()) {
+          sim.sys('economy').earn(p.id, bonus, { bonus: true });
+          sim.touch('players.' + p.id);
+        }
+      }
       if (sim?.st?.daily) {
         sim.st.daily.spinTickets = Math.min(5, (sim.st.daily.spinTickets || 0) + 1);
         sim.touch('daily');
@@ -1482,6 +1562,10 @@ export class ReadySetCook2D {
   update(dt) {
     if (!this.active) return;
     this.t += dt;
+    if (this.matchOver) {
+      this.draw();
+      return;
+    }
 
     // 0. CẬP NHẬT DIFFICULTY DIRECTOR (Chỉ Host chạy match timer & phase để đồng bộ)
     if (this.isHost) {
@@ -1489,6 +1573,10 @@ export class ReadySetCook2D {
         this.difficultyDirector.update(dt);
         this.timer = this.difficultyDirector.getRemainingSeconds();
       }
+    }
+    if (this.matchOver) {
+      this.draw();
+      return;
     }
     if (this.feverT > 0) this.feverT = Math.max(0, this.feverT - dt);
 
@@ -1522,7 +1610,7 @@ export class ReadySetCook2D {
       this.playerController.updateHoldActions(me, dt, (chef, st) => this.isChefNearStation(chef, st));
     }
 
-    // 3. Mèo Phụ Bếp Mimi hỗ trợ nhận order (Chỉ Host chạy logic thưởng và đổi trạng thái)
+    // 3. Mèo Mimi chỉ tự nhận đơn khi người chơi bật trợ giúp.
     if (this.isHost && this.helperOn && this.sousChef) {
       this.sousChef.animT += dt * 6;
       this.sousChef.actionT -= dt;
@@ -1533,7 +1621,7 @@ export class ReadySetCook2D {
           waitTb.guest.phase = 'ordered';
           waitTb.guest.patience = waitTb.guest.maxPatience;
           this.sousChef.statusText = '🐱 Mimi đã ghi order!';
-          this.rewardCoins(15, waitTb.x, waitTb.y - 28, '🐱 Mimi nhận order +15 🪙');
+          this.addFloat(waitTb.x, waitTb.y - 28, '🐱 Mimi đã nhận đơn!', '#ffe066');
         }
       }
     }
@@ -1672,9 +1760,6 @@ export class ReadySetCook2D {
           }
         } else if (g.phase === 'wait_order' || g.phase === 'ordered') {
           g.patience -= dt * 0.35 * patienceMult;
-          if (g.phase === 'wait_order' && g.maxPatience - g.patience > 4.0) {
-            g.phase = 'ordered';
-          }
           if (g.patience <= 0) {
             g.phase = 'walk_out';
             g.path = this.findPath(tb.walkX ?? tb.standX, tb.walkY ?? tb.standY, DOOR_POS.x, DOOR_POS.y);
@@ -1751,6 +1836,40 @@ export class ReadySetCook2D {
     this.draw();
   }
 
+  buildFloorCache() {
+    const canvas = document.createElement('canvas');
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const woodGrad = ctx.createLinearGradient(68, 80, 1180, 680);
+    woodGrad.addColorStop(0, '#9a6f50');
+    woodGrad.addColorStop(0.5, '#896043');
+    woodGrad.addColorStop(1, '#755036');
+    ctx.fillStyle = woodGrad;
+    ctx.fillRect(68, 28, 1144, 672);
+
+    for (let row = 0, y = 40; y < 700; row++, y += 32) {
+      ctx.fillStyle = row % 2 === 0 ? 'rgba(255, 224, 185, 0.05)' : 'rgba(25, 12, 4, 0.06)';
+      ctx.fillRect(68, y, 1144, 32);
+      ctx.strokeStyle = 'rgba(48, 26, 12, 0.42)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(68, y); ctx.lineTo(1212, y); ctx.stroke();
+      for (let x = 130 + ((row * 83) % 190); x < 1180; x += 210) {
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 32); ctx.stroke();
+        ctx.fillStyle = 'rgba(42, 22, 10, 0.35)';
+        ctx.beginPath(); ctx.arc(x - 6, y + 8, 1.8, 0, Math.PI * 2); ctx.arc(x + 6, y + 24, 1.8, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    this.drawDiamondFloor(ctx, [[70, 90], [425, 90], [425, 255], [185, 405], [70, 405]], '#7c91a3', '#64798b', '#415261');
+    this.drawDiamondFloor(ctx, [[70, 520], [445, 520], [445, 700], [70, 700]], '#7c91a3', '#64798b', '#415261');
+    this.drawDiamondFloor(ctx, [[720, 600], [1045, 435], [1195, 435], [1195, 700], [720, 700]], '#7c91a3', '#64798b', '#415261');
+    this.drawDiamondFloor(ctx, [[825, 165], [1185, 165], [1185, 435], [1045, 435]], '#a67f60', '#8d684c', '#5d402a');
+    this.floorCache = canvas;
+  }
+
   // ================== VẼ ĐỒ HOẠ 2.5D DIORAMA SẮC NÉT CHUẨN COATSINK READY, SET, COOK! ==================
   draw() {
     this.syncHiDpi();
@@ -1778,32 +1897,8 @@ export class ReadySetCook2D {
     ctx.rect(64, 24, 1152, 678);
     ctx.clip();
 
-    // 2. SÀN GỖ SỒI ẤM TRUNG TÂM PHÒNG ĂN (Wood Plank Floor có vân gỗ, mắt gỗ & độ bóng)
-    const woodGrad = ctx.createLinearGradient(68, 80, 1180, 680);
-    woodGrad.addColorStop(0, '#9a6f50');
-    woodGrad.addColorStop(0.5, '#896043');
-    woodGrad.addColorStop(1, '#755036');
-    ctx.fillStyle = woodGrad;
-    ctx.fillRect(68, 28, 1144, 672);
-
-    for (let row = 0, y = 40; y < 700; row++, y += 32) {
-      ctx.fillStyle = row % 2 === 0 ? 'rgba(255, 224, 185, 0.05)' : 'rgba(25, 12, 4, 0.06)';
-      ctx.fillRect(68, y, 1144, 32);
-      ctx.strokeStyle = 'rgba(48, 26, 12, 0.42)';
-      ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(68, y); ctx.lineTo(1212, y); ctx.stroke();
-      for (let x = 130 + ((row * 83) % 190); x < 1180; x += 210) {
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 32); ctx.stroke();
-        ctx.fillStyle = 'rgba(42, 22, 10, 0.35)';
-        ctx.beginPath(); ctx.arc(x - 6, y + 8, 1.8, 0, Math.PI * 2); ctx.arc(x + 6, y + 24, 1.8, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-
-    // 3. SÀN GẠCH CARO XOAY CHÉO 45° Ở 4 GÓC BẾP & TRƯỚC LÒ NƯỚNG
-    this.drawDiamondFloor(ctx, [[70, 90], [425, 90], [425, 255], [185, 405], [70, 405]], '#7c91a3', '#64798b', '#415261');
-    this.drawDiamondFloor(ctx, [[70, 520], [445, 520], [445, 700], [70, 700]], '#7c91a3', '#64798b', '#415261');
-    this.drawDiamondFloor(ctx, [[720, 600], [1045, 435], [1195, 435], [1195, 700], [720, 700]], '#7c91a3', '#64798b', '#415261');
-    this.drawDiamondFloor(ctx, [[825, 165], [1185, 165], [1185, 435], [1045, 435]], '#a67f60', '#8d684c', '#5d402a');
+    // Sàn gỗ và gạch caro là cảnh tĩnh, vẽ sẵn một lần để giảm tải mỗi khung hình.
+    if (this.floorCache) ctx.drawImage(this.floorCache, 0, 0);
 
     // Bóng Ambient Occlusion dọc chân tường Bắc và hai bên
     const topAO = ctx.createLinearGradient(0, 95, 0, 165);
@@ -1897,7 +1992,49 @@ export class ReadySetCook2D {
       ctx.restore();
     }
 
+    if (this.matchOver) this.drawShiftResult(ctx);
+
     ctx.restore();
+  }
+
+  drawShiftResult(ctx) {
+    ctx.fillStyle = 'rgba(10, 18, 28, 0.78)';
+    ctx.fillRect(64, 24, 1152, 732);
+    this.inkRoundRect(ctx, 350, 176, 580, 420, 24, '#fff8ec');
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 34px "Baloo 2", sans-serif';
+    ctx.fillStyle = '#a84300';
+    ctx.fillText('🏁 KẾT THÚC CA BẾP!', 640, 224);
+    ctx.font = '700 17px "Baloo 2", sans-serif';
+    ctx.fillStyle = '#5d4037';
+    ctx.fillText('Hai đầu bếp đã hoàn thành ca phục vụ.', 640, 266);
+
+    ctx.font = '900 26px "Baloo 2", sans-serif';
+    ctx.fillStyle = '#a84300';
+    ctx.fillText(`🪙 ${fmt(this.earned)} xu trong ca`, 640, 322);
+    ctx.font = '800 18px "Baloo 2", sans-serif';
+    ctx.fillStyle = '#4e3b2c';
+    ctx.fillText(`🍽️ ${this.served} món đã phục vụ`, 640, 360);
+
+    ctx.font = '900 38px sans-serif';
+    ctx.fillStyle = '#b0a18e';
+    ctx.fillText('★'.repeat(3), 640, 414);
+    ctx.fillStyle = '#f4a62a';
+    ctx.fillText('★'.repeat(this.starsReached) + '☆'.repeat(3 - this.starsReached), 640, 414);
+
+    this.inkRoundRect(ctx, 405, 454, 230, 64, 18, '#267b35');
+    this.inkRoundRect(ctx, 405, 448, 230, 62, 18, '#55bd4a');
+    this.inkRoundRect(ctx, 645, 454, 230, 64, 18, '#a84300');
+    this.inkRoundRect(ctx, 645, 448, 230, 62, 18, '#f59e42');
+    ctx.font = '900 18px "Baloo 2", sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.fillText('🔁 CHƠI CA MỚI', 520, 479);
+    ctx.fillText('🏡 VỀ NÔNG TRẠI', 760, 479);
+    ctx.font = '700 12px "Baloo 2", sans-serif';
+    ctx.fillStyle = '#fff7e6';
+    ctx.fillText('Chơi cùng nhau từ đầu', 520, 498);
+    ctx.fillText('Giữ tiến độ trang trại', 760, 498);
   }
 
   // Hàm dựng Quầy Bếp Inox 3D có mặt trước (Cabinet Front), chân đế (Toe-kick) và mặt bàn vát sáng (Beveled Top)
@@ -3059,7 +3196,7 @@ export class ReadySetCook2D {
     ctx.restore();
   }
 
-  // Mèo Phụ Bếp Mimi (Lấy cảm hứng từ Cat Snack Bar - đội mũ Bếp Trưởng trắng, tự động nhận order, bưng món & dọn đĩa!)
+  // Mèo Mimi đứng cạnh quầy và hỗ trợ nhận đơn khi người chơi bật trợ giúp.
   drawSousChefMimi(ctx, m) {
     ctx.save();
     const bob = Math.sin(m.animT || this.t * 10) * 2.5;
@@ -3330,7 +3467,7 @@ export class ReadySetCook2D {
       ctx.fillRect(tx + 7, ty + th - 5, Math.max(2, (tw - 14) * pct), 4);
     }
 
-    // 4a. Nút [🚀 PHASE 1/2/3] của DifficultyDirector (x: 778..896, y: 44..94) — Hiển thị Phase & Chạm để lên Phase ngay!
+    // 4a. Huy hiệu giai đoạn và tiến trình mở món theo thời gian phục vụ.
     const curPhase = this.difficultyDirector?.phase || 1;
     const phaseBg = curPhase === 3 ? '#ff6d00' : curPhase === 2 ? '#ffa000' : '#2e7d32';
     const phaseShadow = curPhase === 3 ? '#bf360c' : curPhase === 2 ? '#e65100' : '#1b5e20';
@@ -3346,7 +3483,7 @@ export class ReadySetCook2D {
     );
     ctx.font = '800 10px "Baloo 2", sans-serif';
     ctx.fillStyle = '#fff9c4';
-    ctx.fillText(curPhase < 3 ? '🚀 Chạm Lên Phase' : '🔄 Chạm Reset Phase', 837, 76);
+    ctx.fillText(curPhase < 3 ? 'Món mới tự mở theo ca' : 'Đã mở đủ thực đơn', 837, 76);
 
     // Banner Thông Báo Chuyển Phase (Rush Hour / LEVEL UP! Menu Expansion)
     const banner = this.difficultyDirector?.announcementBanner;
