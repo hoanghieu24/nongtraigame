@@ -35,11 +35,21 @@ export const DAILY_CHESTS = [
 ];
 
 export const DAILY_FORTUNES = [
-  { icon: '🌟', title: 'Quẻ Đại Cát — Mùa Vụ Bội Thu', desc: 'Cây trồng hôm nay xanh tốt, bán nông sản tiêu điểm lời ×1.5!' },
-  { icon: '🍕', title: 'Quẻ Thực Thần — Quán Ăn Đông Khách', desc: 'Khách vào Quán Pizza & Trà Sữa hào phóng thưởng Tip cao!' },
-  { icon: '🎣', title: 'Quẻ Thuỷ Tinh — Cá Lớn Cắn Câu', desc: 'Bờ sông nhiều cá quý, đi câu rất dễ trúng thưởng lớn!' },
-  { icon: '🐔', title: 'Quẻ Lục Súc — Chuồng Trại Sung Túc', desc: 'Vật nuôi vui vẻ, chăm chỉ cho trứng và sữa tươi!' },
-  { icon: '💎', title: 'Quẻ Tài Lộc — Vận May Rực Rỡ', desc: 'Quay Vòng Quay May Mắn hôm nay cực kỳ dễ trúng lớn!' },
+  { icon: '🌟', title: 'Quẻ Đại Cát — Mùa Vụ Bội Thu', desc: 'Mỗi lần thu hoạch có 25% cơ hội nhận thêm 1 nông sản!' },
+  { icon: '🍕', title: 'Quẻ Thực Thần — Quán Ăn Đông Khách', desc: 'Phần thưởng ca làm thêm nhà hàng tăng 20% hôm nay!' },
+  { icon: '🎣', title: 'Quẻ Thuỷ Tinh — Cá Lớn Cắn Câu', desc: 'Cơ hội gặp cá hiếm tăng 25% hôm nay!' },
+  { icon: '🐔', title: 'Quẻ Lục Súc — Chuồng Trại Sung Túc', desc: 'Vật nuôi tạo sản phẩm nhanh hơn 20% hôm nay!' },
+  { icon: '💎', title: 'Quẻ Tài Lộc — Vận May Rực Rỡ', desc: 'Mỗi lượt quay hôm nay nhận thêm 100 xu!' },
+];
+
+const dateKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const previousDateKey = (key) => { const [y, m, d] = key.split('-').map(Number); return dateKey(new Date(y, m - 1, d - 1)); };
+const weekKey = (date = new Date()) => { const monday = new Date(date); monday.setHours(0, 0, 0, 0); monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7)); return dateKey(monday); };
+
+export const WEEKLY_GOALS = [
+  { id: 'harvest', title: 'Thu hoạch nông sản', icon: '🌾', target: 24, coins: 360, xp: 35, fund: 180, item: 'seed_carrot', qty: 5, desc: '+360🪙 • +180🏦 • ×5 Hạt Cà Rốt' },
+  { id: 'collect', title: 'Thu sản phẩm vật nuôi', icon: '🥚', target: 10, coins: 440, xp: 40, fund: 220, item: 'feed', qty: 5, desc: '+440🪙 • +220🏦 • ×5 Thức Ăn' },
+  { id: 'feed', title: 'Cho vật nuôi ăn', icon: '🐔', target: 14, coins: 320, xp: 30, fund: 160, item: 'feed', qty: 6, desc: '+320🪙 • +160🏦 • ×6 Thức Ăn' },
 ];
 
 // Nhiệm vụ cả nhà (chung) + yêu cầu của hàng xóm + nhiệm vụ co-op + Điểm Danh & Vòng Quay Hằng Ngày.
@@ -57,15 +67,7 @@ export class QuestSystem {
   }
   newDay() {
     const { sim } = this, st = sim.st, rng = sim.rng, lvl = st.farm.level, many = sim.connected().length >= 2;
-    if (!st.daily) st.daily = { streak: 1, claimedDay: 0, spinTickets: 1, activity: 0, chests: [false, false, false], fortune: 0, lastPrize: '', lastWheelIdx: -1 };
-    if (st.world.day > 1) {
-      if (st.daily.claimedDay === st.world.day - 1) st.daily.streak = (st.daily.streak || 1) + 1;
-      st.daily.spinTickets = Math.min(5, (st.daily.spinTickets || 0) + 1);
-      st.daily.activity = 0;
-      st.daily.chests = [false, false, false];
-      st.daily.fortune = rng.int(0, DAILY_FORTUNES.length - 1);
-    }
-    sim.touch('daily');
+    this.refreshCalendar();
     const crops = CROP_LIST.filter((k) => !CROPS[k].rare && !CROPS[k].event && !CROPS[k].only && CROPS[k].lvl <= lvl);
     const hasAnimals = Object.values(st.animals).some((a) => a.type !== 'dog');
     const list = [];
@@ -97,18 +99,91 @@ export class QuestSystem {
     }
     st.quests = { day: st.world.day, list }; sim.touch('quests');
   }
-  onNewDay() { this.newDay(); this.sim.toast(undefined, '🎁 Ngày mới! Mở Quà Hằng Ngày để Điểm Danh & Quay Thưởng nhé!', 'good'); }
+  onNewDay() { this.newDay(); this.sim.toast(undefined, '📜 Bảng nhiệm vụ đã có việc mới cho cả nhà!', 'good'); }
+
+  refreshCalendar() {
+    const { sim } = this, st = sim.st;
+    const d = (st.daily ??= { streak: 1, claimedDay: 0, claimDate: '', calendarDate: '', spinTickets: 1, activity: 0, activityTicketClaimed: false, chests: [false, false, false], fortune: 0, lastPrize: '', lastWheelIdx: -1 });
+    const today = dateKey(), yesterday = previousDateKey(today);
+    if (!Array.isArray(d.chests)) d.chests = [false, false, false];
+    if (d.calendarDate !== today) {
+      if (d.calendarDate) {
+        d.streak = d.claimDate === yesterday ? (d.streak || 1) + 1 : 1;
+        d.spinTickets = Math.min(5, (d.spinTickets || 0) + 1);
+      } else d.streak = d.claimDate === yesterday ? Math.max(1, d.streak || 1) : 1;
+      d.calendarDate = today;
+      d.activity = 0;
+      d.activityTicketClaimed = false;
+      d.chests = [false, false, false];
+      d.fortune = sim.rng.int(0, DAILY_FORTUNES.length - 1);
+      sim.touch('daily');
+    }
+    const week = weekKey();
+    if (!st.weekly || st.weekly.week !== week || !st.weekly.progress || !Array.isArray(st.weekly.claimed)) {
+      st.weekly = { week, progress: { harvest: 0, collect: 0, feed: 0 }, claimed: [], bonusClaimed: false };
+      sim.touch('weekly');
+    }
+  }
+
+  addActivity(points) {
+    const { sim } = this, d = sim.st.daily;
+    const before = d.activity || 0;
+    if (before >= 100) return;
+    d.activity = Math.min(100, before + points);
+    if (d.activity >= 100 && !d.activityTicketClaimed) {
+      d.activityTicketClaimed = true;
+      if ((d.spinTickets || 0) < 5) {
+        d.spinTickets = (d.spinTickets || 0) + 1;
+        sim.fx({ k: 'banner', text: '🎡 Đạt 100 Năng Động!', sub: '+1 vé quay thưởng cho cả nhà', tone: 'good' });
+      }
+    }
+    sim.touch('daily');
+  }
+
+  trackWeekly(e) {
+    const { sim } = this, st = sim.st;
+    const goal = WEEKLY_GOALS.find((g) => g.id === e.type);
+    if (!goal || !e.pid) return;
+    const w = st.weekly;
+    const have = Math.min(goal.target, w.progress[goal.id] || 0);
+    if (have >= goal.target) return;
+    w.progress[goal.id] = Math.min(goal.target, have + Math.max(1, e.n | 0));
+    if (w.progress[goal.id] >= goal.target && !w.claimed.includes(goal.id)) {
+      w.claimed.push(goal.id);
+      if (goal.fund) { st.economy.fund += goal.fund; sim.touch('economy'); }
+      for (const p of sim.connected()) {
+        sim.sys('economy').earn(p.id, goal.coins, { bonus: false });
+        sim.sys('prog').addXp(p.id, goal.xp);
+        sim.addItem(p.id, goal.item, goal.qty);
+      }
+      sim.fx({ k: 'banner', text: `🏅 Cả nhà hoàn thành: ${goal.title}!`, sub: goal.desc, tone: 'good' });
+      sim.fx({ k: 'sfx', name: 'quest' });
+      if (WEEKLY_GOALS.every((g) => w.claimed.includes(g.id)) && !w.bonusClaimed) {
+        w.bonusClaimed = true;
+        for (const p of sim.connected()) {
+          sim.sys('economy').earn(p.id, 800, { bonus: false });
+          sim.sys('prog').addXp(p.id, 100);
+          sim.addItem(p.id, 'golden_egg', 1);
+        }
+        st.economy.fund += 500; sim.touch('economy');
+        sim.fx({ k: 'banner', text: '👑 Hội Chợ Cuối Tuần: đủ bộ!', sub: '+800🪙 +100 XP +🥇 Trứng Vàng cho mỗi người • +500🏦 Quỹ Chung', tone: 'level' });
+        sim.fx({ k: 'confetti' });
+      }
+    }
+    sim.touch('weekly');
+  }
 
   dailyClaim(pid) {
     const { sim } = this, st = sim.st;
-    const d = (st.daily ??= { streak: 1, claimedDay: 0, spinTickets: 1, activity: 0, chests: [false, false, false], fortune: 0, lastPrize: '', lastWheelIdx: -1 });
-    if (d.claimedDay === st.world.day) return fail('Hôm nay bạn đã nhận quà điểm danh rồi!');
-    if (d.claimedDay > 0 && d.claimedDay < st.world.day - 1) d.streak = (d.streak || 1) + 1;
+    this.refreshCalendar();
+    const d = st.daily;
+    if (d.claimDate === d.calendarDate) return fail('Bạn đã nhận quà điểm danh hôm nay rồi!');
     const idx = ((d.streak || 1) - 1) % DAILY_REWARDS.length;
     const rw = DAILY_REWARDS[idx];
     const streakBonus = Math.round(rw.coins * Math.min(0.35, ((d.streak || 1) - 1) * 0.05));
     const totalCoins = rw.coins + streakBonus;
     d.claimedDay = st.world.day;
+    d.claimDate = d.calendarDate;
     if (rw.spin) d.spinTickets = (d.spinTickets || 0) + rw.spin;
     if (rw.fund) { st.economy.fund += rw.fund; sim.touch('economy'); }
     for (const p of sim.connected()) {
@@ -118,7 +193,7 @@ export class QuestSystem {
       if (rw.extraItem) sim.addItem(p.id, rw.extraItem, rw.extraQty || 1);
       if (rw.furn) { st.inventory.stash[rw.furn] = (st.inventory.stash[rw.furn] || 0) + 1; sim.touch('inventory.stash'); }
     }
-    d.activity = Math.min(100, (d.activity || 0) + 15);
+    this.addActivity(15);
     sim.touch('daily');
     sim.fx({ k: 'banner', text: `🎁 Điểm Danh Ngày ${rw.day}: ${rw.title}!`, sub: `+${totalCoins} 🪙 +${rw.xp} XP • 🔥 Chuỗi ${d.streak} ngày`, tone: 'good', to: pid });
     sim.fx({ k: 'sfx', name: 'quest', to: pid });
@@ -128,22 +203,24 @@ export class QuestSystem {
 
   dailySpin(pid) {
     const { sim } = this, st = sim.st;
-    const d = (st.daily ??= { streak: 1, claimedDay: 0, spinTickets: 1, activity: 0, chests: [false, false, false], fortune: 0, lastPrize: '', lastWheelIdx: -1 });
+    this.refreshCalendar();
+    const d = st.daily;
     if ((d.spinTickets || 0) <= 0) return fail('Hết vé quay hôm nay! Hãy làm nhiệm vụ đạt 100⚡ Năng Động hoặc sang ngày mới nhé.');
     d.spinTickets -= 1;
     const idx = sim.rng.int(0, DAILY_WHEEL.length - 1);
     const pr = DAILY_WHEEL[idx];
+    const fortuneBonus = d.fortune === 4 ? 100 : 0;
     d.lastWheelIdx = idx;
     d.lastPrize = `${pr.icon} ${pr.name} (${pr.desc})`;
     if (pr.fund) { st.economy.fund += pr.fund; sim.touch('economy'); }
     for (const p of sim.connected()) {
-      if (pr.coins) sim.sys('economy').earn(p.id, pr.coins, { bonus: false });
+      if (pr.coins || fortuneBonus) sim.sys('economy').earn(p.id, (pr.coins || 0) + fortuneBonus, { bonus: false });
       if (pr.xp) sim.sys('prog').addXp(p.id, pr.xp);
       if (pr.item) sim.addItem(p.id, pr.item, pr.qty || 1);
       if (pr.item2) sim.addItem(p.id, pr.item2, pr.qty2 || 1);
     }
     sim.touch('daily');
-    sim.fx({ k: 'banner', text: `🎡 Trúng thưởng: ${pr.icon} ${pr.name}!`, sub: pr.desc, tone: 'level', to: pid });
+    sim.fx({ k: 'banner', text: `🎡 Trúng thưởng: ${pr.icon} ${pr.name}!`, sub: `${pr.desc}${fortuneBonus ? ' • Quẻ Tài Lộc +100🪙' : ''}`, tone: 'level', to: pid });
     sim.fx({ k: 'sfx', name: 'levelup', to: pid });
     sim.fx({ k: 'confetti', to: pid });
     return ok({ idx, prize: pr });
@@ -151,7 +228,8 @@ export class QuestSystem {
 
   dailyChest(pid, { idx }) {
     const { sim } = this, st = sim.st;
-    const d = (st.daily ??= { streak: 1, claimedDay: 0, spinTickets: 1, activity: 0, chests: [false, false, false], fortune: 0, lastPrize: '', lastWheelIdx: -1 });
+    this.refreshCalendar();
+    const d = st.daily;
     const i = +idx;
     const ch = DAILY_CHESTS[i];
     if (!ch) return fail('Rương không hợp lệ');
@@ -188,21 +266,16 @@ export class QuestSystem {
       if (q.reward.furn) { sim.st.inventory.stash[q.reward.furn] = (sim.st.inventory.stash[q.reward.furn] || 0) + 1; sim.touch('inventory.stash'); }
     }
     if (sim.st.daily) {
-      sim.st.daily.activity = Math.min(100, (sim.st.daily.activity || 0) + 15);
-      sim.touch('daily');
+      this.addActivity(15);
     }
     sim.fx({ k: 'banner', text: q.coop ? '🤝 Nhiệm vụ co-op hoàn thành!' : '✅ Nhiệm vụ hoàn thành!', sub: `+${q.reward.coins} 🪙 +${q.reward.xp} XP${q.reward.furn ? ` +${FURN[q.reward.furn].icon}` : ''}`, tone: 'good', to: only || undefined });
     sim.fx({ k: 'sfx', name: 'quest', to: only || undefined }); sim.fx({ k: 'confetti', to: only || undefined });
     sim.touch('quests'); sim.game({ type: 'quest_done', id: q.id });
   }
   onGame(e) {
-    const { sim } = this, st = sim.st; this.tutor(e);
+    const { sim } = this, st = sim.st; this.refreshCalendar(); this.tutor(e); this.trackWeekly(e);
     const actPts = { harvest: 8, plant: 5, water: 4, feed: 7, pet: 6, collect: 8, fish: 14, sell: 6, cook: 16, deliver: 18, chase: 20 }[e.type];
-    if (actPts && e.pid && st.daily) {
-      const prev = st.daily.activity || 0;
-      st.daily.activity = Math.min(100, prev + actPts);
-      if (st.daily.activity !== prev) sim.touch('daily');
-    }
+    if (actPts && e.pid && st.daily) this.addActivity(actPts);
     const map = { harvest: ['harvest', 'coop_harvest'], plant: ['plant'], water: ['water', 'coop_water'], feed: ['feed'], pet: ['pet'], collect: ['collect'], fish: ['fish'], sell: ['sell'], cook: ['cook'], chase: ['chase'] }[e.type];
     if (!map || !e.pid) return;
     let touched = false;

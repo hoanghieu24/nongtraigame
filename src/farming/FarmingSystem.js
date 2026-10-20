@@ -65,7 +65,8 @@ export class FarmingSystem {
     const { sim } = this, { err, pos, c } = this.plot(pid, plot); if (err) return fail(err);
     if (!c || c.s !== 'ripe') return fail('Chưa chín đâu!');
     const cropId = c.crop, def = CROPS[cropId], team = c.by.length >= 2, lucky = sim.rng.chance(0.06);
-    const qty = 1 + (team ? 1 : 0) + (lucky ? 1 : 0);
+    const fortuneBonus = sim.st.daily?.fortune === 0 && sim.rng.chance(0.25);
+    const qty = 1 + (team ? 1 : 0) + (lucky ? 1 : 0) + (fortuneBonus ? 1 : 0);
     sim.addItem(pid, cropId, qty); this.stat(pid, 'harvest');
     if (def.regrow) { c.s = 'planted'; c.g = 0.45; } else { c.s = 'tilled'; delete c.crop; c.g = 0; delete c.fast; }
     c.by = [];
@@ -74,6 +75,7 @@ export class FarmingSystem {
     sim.fx({ k: 'float', x: pos.x, z: pos.z, y: 1.8, text: `+${qty} ${def.icon}`, color: '#fff', to: pid });
     if (team) { sim.fx({ k: 'float', x: pos.x, z: pos.z, y: 2.6, text: '🤝 Teamwork +1!', color: '#ffd166' }); }
     else if (lucky) { sim.fx({ k: 'float', x: pos.x, z: pos.z, y: 2.6, text: '🍀 May mắn +1!', color: '#9be26b' }); }
+    if (fortuneBonus) sim.fx({ k: 'float', x: pos.x, z: pos.z, y: 3.2, text: '🌟 Quẻ Đại Cát +1!', color: '#ffe066', to: pid });
     sim.sys('prog').addXp(pid, def.xp * qty);
     sim.game({ type: 'harvest', pid, plot, item: cropId, n: qty, team });
     return ok();

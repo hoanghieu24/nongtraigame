@@ -293,7 +293,7 @@ export class AnimalSystem {
       }
       a.happy = a.hunger > 0.6 ? Math.max(0, a.happy - dt / 240) : Math.min(1, a.happy + dt / 600);
       if (def.prod && a.growth >= 1 && !a.ready) {
-        if (a.hunger < 0.8) a.prodT += dt * (0.6 + 0.8 * a.happy) * (a.golden ? 1.5 : 1);
+        if (a.hunger < 0.8) a.prodT += dt * (0.6 + 0.8 * a.happy) * (a.golden ? 1.5 : 1) * (st.daily?.fortune === 3 ? 1.2 : 1);
         if (a.prodT >= def.prod.every) {
           a.ready = true; a.prodT = 0; a._eggWait = 0;
           sim.touch('animals.' + a.id); sim.fx({ k: 'sfx', name: 'ding', x: a.x, z: a.z });

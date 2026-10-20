@@ -129,6 +129,13 @@ h4{margin:10px 0 4px;font-size:16px}h4 small{font-weight:600;color:var(--ink2);f
 .two{display:grid;grid-template-columns:1fr;gap:10px}.fundbox{background:#fff0dd;border-radius:14px;padding:8px 10px;margin-top:8px}.fundbox b,.fundbox small{display:block}
 .bar{display:block;height:9px;border-radius:9px;background:#eadfca;overflow:hidden;margin:3px 0}.bar u{display:block;height:100%;background:var(--green);border-radius:9px;transition:width .3s}.bar.xp u{background:var(--gold)}.bar.pat u{background:var(--orange)}
 .quest{display:flex;gap:10px;align-items:center;background:#fff;border-radius:16px;padding:8px 10px;margin:6px 0}.quest>div{flex:1}.quest.done{opacity:.55}
+/* ---- Mục tiêu trồng trọt và chăn nuôi chung theo tuần ---- */
+.weeklyBoard{margin:9px 0;padding:9px;background:linear-gradient(145deg,#f0fae8,#fff9e6);border:1.5px solid #a8d48c;border-radius:17px}
+.weeklyHead{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;margin-bottom:5px}.weeklyHead b{font-size:15px;color:#365d2e}.weeklyHead small{font-size:11px}
+.weeklyGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.weeklyGoal{display:flex;align-items:center;gap:7px;min-width:0;padding:7px;background:rgba(255,255,255,.88);border:1px solid #dcebd2;border-radius:12px}
+.weeklyGoal>span{font-size:23px}.weeklyGoal>div{min-width:0;flex:1}.weeklyGoal b{display:flex;justify-content:space-between;gap:3px;font-size:11.5px;line-height:1.15}.weeklyGoal b small{white-space:nowrap}.weeklyGoal>div>small{display:block;font-size:9.5px;line-height:1.15}.weeklyGoal.done{background:#e8f7e2;border-color:#8bc978}
+.weeklyBonus{margin-top:6px;padding:5px 7px;text-align:center;background:#fff0c2;border-radius:10px;font-size:11px;font-weight:800;color:#72501a}.weeklyBonus.done{background:#e8f7e2;color:#347329}
 /* ---- Giao diện Điểm Danh 7 Ngày, Rương Năng Động & Vòng Quay May Mắn ---- */
 .dailyHero{background:linear-gradient(135deg,#fff8e1,#ffe3a8);border:2px solid #f59f00;border-radius:18px;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;box-shadow:0 4px 12px rgba(245,159,0,.18)}
 .dhLeft{display:flex;align-items:center;gap:10px;flex:1;min-width:200px}
@@ -164,6 +171,7 @@ h4{margin:10px 0 4px;font-size:16px}h4 small{font-weight:600;color:var(--ink2);f
 .wheelCard .wIc{font-size:24px;line-height:1}
 .wheelCard b{font-size:12px;line-height:1.15}
 .wheelCard small{font-size:10px;line-height:1.15}
+@media(max-width:650px){.weeklyGrid{grid-template-columns:1fr}.weeklyGoal{padding:6px 8px}.weeklyGoal>span{font-size:21px}.weeklyGoal b{font-size:12px}.weeklyGoal>div>small{font-size:10px}}
 .wheelCard.spinHi{transform:scale(1.06);background:#fff3bf;box-shadow:0 0 14px rgba(245,159,0,.65);border-width:3px}
 .wheelCard.won{background:linear-gradient(180deg,#fff9db,#ffec99);box-shadow:0 0 0 2.5px #f59f00}
 .wheelFoot{text-align:center}

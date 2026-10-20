@@ -9,7 +9,7 @@ export class ClockSystem {
     w.t += dt; st.meta.playTime += dt;
     const ti = timeInfo(w.t, CFG);
     if (ti.day !== w.day) { w.day = ti.day; w.season = ti.season; this.sim.newDay(); this.sim.touch('world'); }
-    this.acc += dt; if (this.acc >= 1) { this.acc = 0; this.sim.touch('world'); }
+    this.acc += dt; if (this.acc >= 1) { this.acc = 0; this.sim.sys('quest')?.refreshCalendar(); this.sim.touch('world'); }
   }
   // Chỉ cho phép ngủ vào buổi tối (từ 18:00 đến 05:30 sáng) hoặc khi trời đang mưa / giông bão
   sleep(pid) {

@@ -1466,9 +1466,10 @@ export class ReadySetCook2D {
   }
 
   rewardCoins(amount, x, y, label) {
+    const sim = this.g?.session?.sim || this.g?.sim;
+    if (sim?.st.daily?.fortune === 1) { amount = Math.round(amount * 1.2); label += ' • Quẻ Thực Thần +20%'; }
     this.earned += amount;
     this.addFloat(x, y, label, '#ffe066');
-    const sim = this.g?.session?.sim || this.g?.sim;
     while (this.starsReached < STAR_GOALS.length && this.earned >= STAR_GOALS[this.starsReached]) {
       this.starsReached++;
       const bonus = this.starsReached * 80;
@@ -1490,10 +1491,7 @@ export class ReadySetCook2D {
       for (const p of sim.connected()) {
         sim.sys('economy').earn(p.id, amount, { bonus: true });
         sim.sys('prog').addXp(p.id, 10);
-        if (sim.st.daily) {
-          sim.st.daily.activity = Math.min(100, (sim.st.daily.activity || 0) + 8);
-          sim.touch('daily');
-        }
+        if (sim.st.daily) sim.sys('quest')?.addActivity(8);
         sim.touch('players.' + p.id);
       }
     }

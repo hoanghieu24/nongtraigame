@@ -41,13 +41,17 @@ export function createGameState({ farmName = 'Nông Trại Gia Đình', hostId =
     daily: {
       streak: 1,
       claimedDay: 0,
+      claimDate: '',
+      calendarDate: '',
       spinTickets: 1,
       activity: 0,
+      activityTicketClaimed: false,
       chests: [false, false, false],
       fortune: 0,
       lastPrize: '',
       lastWheelIdx: -1,
     },
+    weekly: { week: '', progress: { harvest: 0, collect: 0, feed: 0 }, claimed: [], bonusClaimed: false },
     events: { active: [], next: 75, contest: null, party: null },
     restaurant: {
       unlocked: false, kitchen: 1, tables: 2, deco: 1, stars: 1, rep: 0,
@@ -85,6 +89,7 @@ export function migrate(st) {
   for (const k of ['meta', 'world', 'farm', 'economy', 'daily', 'events', 'restaurant', 'inventory', 'house'])
     for (const kk of Object.keys(d[k])) if (st[k][kk] === undefined) st[k][kk] = d[k][kk];
   if (!Array.isArray(st.daily.chests)) st.daily.chests = [false, false, false];
+  if (!Array.isArray(st.weekly?.claimed)) st.weekly = { week: '', progress: { harvest: 0, collect: 0, feed: 0 }, claimed: [], bonusClaimed: false };
   if (!st.restaurant.shift) st.restaurant.shift = { active: false, by: '', startedAt: 0, served: 0, earned: 0, combo: 0, lastServeAt: 0 };
   if (!st.restaurant.boards) st.restaurant.boards = {};
   if (!Array.isArray(st.restaurant.pass)) st.restaurant.pass = [];

@@ -529,7 +529,7 @@ export class RestaurantSystem {
     const { sim } = this, r = sim.st.restaurant, c = CUSTOMERS[guest.kind], deco = 1 + 0.12 * ((r.deco || 1) - 1);
     const left = Math.max(0, guest.patience) / c.patience, mult = guest.kind === 'fancy' ? 2 : 1;
     const base = Math.round(price * mult * (1 + 0.05 * ((r.stars || 1) - 1)));
-    const tip = Math.round(base * c.tip * (0.55 + 0.95 * left) * deco * comboMult);
+    const tip = Math.round(base * c.tip * (0.55 + 0.95 * left) * deco * comboMult * (sim.st.daily?.fortune === 1 ? 1.2 : 1));
     // Quỹ chung luôn nhận doanh thu cơ bản của quán, và nếu người chơi đang làm thêm thì nhận thêm Lương làm thêm + Tip trực tiếp vào ví cá nhân!
     sim.sys('economy').toFund(base);
     let wage = 0;

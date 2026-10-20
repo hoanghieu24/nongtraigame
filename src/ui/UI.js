@@ -13,7 +13,7 @@ import { HATS, PRESETS } from '../data/characters.js';
 import { EVENTS } from '../data/events.js';
 import { ANIMALS, STARVE } from '../data/animals.js';
 import { questText, QUEST_ICON } from '../data/quests.js';
-import { DAILY_REWARDS, DAILY_WHEEL, DAILY_CHESTS, DAILY_FORTUNES } from '../quests/QuestSystem.js';
+import { DAILY_REWARDS, DAILY_WHEEL, DAILY_CHESTS, DAILY_FORTUNES, WEEKLY_GOALS } from '../quests/QuestSystem.js';
 import { levelProgress } from '../data/levels.js';
 import { interiorRoom, REST, inRest, PLOT, plotPos, PENS } from '../data/layout.js';
 import { INCUBATE_SECONDS } from '../animals/AnimalSystem.js';
@@ -167,7 +167,7 @@ export class UI {
   enterGame() {
     this.menu.hide(); $('#hud').classList.remove('hidden'); $('#app').classList.add('playing'); this.refreshHotbar(); this.refreshView(); this.close();
     const st = this.g.store.state;
-    if (st.daily && st.daily.claimedDay !== st.world.day) {
+    if (st.daily && (!st.daily.calendarDate || st.daily.claimDate !== st.daily.calendarDate)) {
       setTimeout(() => { if (!this.panel && !this.g.rsc2d?.active) this.open('daily'); }, 650);
     } else if (this.g.session.role === 'host') {
       setTimeout(() => { if (!this.panel && !this.g.rsc2d?.active) this.open('room'); }, 600);
@@ -243,7 +243,7 @@ export class UI {
     const n = st.quests.list.filter((q) => !q.done).length;
     if (d) { d.classList.toggle('hidden', n === 0); d.textContent = n; }
     const dl = st.daily || {};
-    const canClaim = dl.claimedDay !== st.world.day ? 1 : 0;
+    const canClaim = !dl.calendarDate || dl.claimDate !== dl.calendarDate ? 1 : 0;
     const spins = dl.spinTickets || 0;
     const readyChests = DAILY_CHESTS.filter((c, i) => (dl.activity || 0) >= c.pts && !(dl.chests && dl.chests[i])).length;
     const dn = canClaim + spins + readyChests;
@@ -544,10 +544,20 @@ export class UI {
   }
 
   // ---------------- Bảng Điểm Danh 7 Ngày, Vòng Quay May Mắn & Rương Năng Động ----------------
+  weeklyBoard(st) {
+    const w = st.weekly || { progress: {}, claimed: [], bonusClaimed: false };
+    const cards = WEEKLY_GOALS.map((g) => {
+      const have = clamp(w.progress?.[g.id] || 0, 0, g.target), done = (w.claimed || []).includes(g.id);
+      return `<div class="weeklyGoal ${done ? 'done' : ''}"><span>${done ? '✅' : g.icon}</span><div><b>${g.title} <small>${have}/${g.target}</small></b>${bar(have / g.target, 'xp')}<small>${g.desc}</small></div></div>`;
+    }).join('');
+    const finished = WEEKLY_GOALS.every((g) => (w.claimed || []).includes(g.id));
+    return `<section class="weeklyBoard"><div class="weeklyHead"><b>🏅 Hội Chợ Cuối Tuần</b><small>Cả nhà cùng góp tiến độ • đổi mục tiêu vào thứ Hai</small></div><div class="weeklyGrid">${cards}</div><div class="weeklyBonus ${w.bonusClaimed ? 'done' : ''}">${w.bonusClaimed ? '👑 Đã nhận quà lớn tuần này!' : finished ? '🎁 Đang trao quà cuối tuần...' : '🎁 Đủ 3 mốc: mỗi người nhận Trứng Vàng + 800🪙, Quỹ Chung +500🏦'}</div></section>`;
+  }
+
   p_daily(st) {
     const d = st.daily || { streak: 1, claimedDay: 0, spinTickets: 1, activity: 0, chests: [false, false, false], fortune: 0, lastPrize: '', lastWheelIdx: -1 };
     const streak = d.streak || 1;
-    const claimedToday = d.claimedDay === st.world.day;
+    const claimedToday = !!d.calendarDate && d.claimDate === d.calendarDate;
     const curIdx = (streak - 1) % DAILY_REWARDS.length;
     const fort = DAILY_FORTUNES[(d.fortune || 0) % DAILY_FORTUNES.length];
     const bonusPct = Math.min(35, (streak - 1) * 5);
@@ -567,6 +577,8 @@ export class UI {
       </div>
       ${btn('dailyClaim', claimedToday ? '✅ Đã Điểm Danh' : `🎁 Nhận Quà Ngày ${(curIdx + 1)}!`, '', claimedToday ? 'sm off' : 'go pulseBtn')}
     </div>`;
+
+    h += this.weeklyBoard(st);
 
     // 2. Lịch Điểm Danh 7 Ngày
     h += `<h4>📅 Lịch Quà Điểm Danh 7 Ngày <small>(Vào chơi mỗi ngày để nhận đủ bộ quà Chủ Nhật 👑)</small></h4>`;
@@ -618,12 +630,12 @@ export class UI {
   p_quests(st, me) {
     const d = st.daily || {};
     const actPts = clamp(d.activity || 0, 0, 100);
-    const canClaim = d.claimedDay !== st.world.day || (d.spinTickets || 0) > 0 || DAILY_CHESTS.some((c, i) => actPts >= c.pts && !(d.chests && d.chests[i]));
+    const canClaim = !d.calendarDate || d.claimDate !== d.calendarDate || (d.spinTickets || 0) > 0 || DAILY_CHESTS.some((c, i) => actPts >= c.pts && !(d.chests && d.chests[i]));
     const topTabs = `<div class="tabs">${btn('openQuests', '📜 Nhiệm Vụ Hôm Nay', '', 'on')}${btn('openDaily', `🎁 Điểm Danh & Vòng Quay ${canClaim ? '🔴' : ''}`, '', 'ghost')}</div>`;
     const actBanner = `<div class="note" style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>🔥 Chuỗi <b>${d.streak || 1} ngày</b> • ⚡ Năng động: <b>${actPts}/100⚡</b></span>${btn('openDaily', '🎁 Mở Rương & Quay Thưởng', '', 'sm go')}</div>`;
     const tut = st.meta.tut < 6 ? `<div class="note">🎓 Hướng dẫn: bước ${st.meta.tut + 1}/6 ${btn('skiptut', 'Bỏ qua', '', 'sm ghost')}</div>` : '', bag = st.inventory.players[me.id] || {};
     const list = st.quests.list.map((q) => { const p = q.have / q.n, rw = q.reward; return `<div class="quest ${q.done ? 'done' : ''}"><span class="ti">${q.done ? '✅' : QUEST_ICON[q.kind] || '📜'}</span><div><b>${questText(q)}${q.coop ? ' 🤝' : ''}</b>${bar(p)}<small>${Math.min(q.have, q.n)}/${q.n} • thưởng 🪙${rw.coins} ⭐${rw.xp}${rw.item ? ' ' + ITEMS[rw.item].icon + '×' + rw.qty : ''}${rw.furn ? ' ' + FURN[rw.furn].icon : ''}</small></div>${q.kind === 'deliver' && !q.done ? btn('deliver', `Giao ${ITEMS[q.item].icon}`, `data-id="${q.id}"`, (bag[q.item] || 0) >= q.n ? 'sm' : 'sm off') : ''}</div>`; }).join('');
-    return topTabs + actBanner + tut + (list || '<p class="empty">Chưa có nhiệm vụ</p>') + '<small class="hint">Nhiệm vụ làm chung cả nhà; 🤝 co-op cần ít nhất 2 người cùng làm. Mỗi sáng có nhiệm vụ mới.</small>';
+    return topTabs + actBanner + this.weeklyBoard(st) + tut + (list || '<p class="empty">Chưa có nhiệm vụ</p>') + '<small class="hint">Nhiệm vụ làm chung cả nhà; 🤝 co-op cần ít nhất 2 người cùng làm. Mỗi sáng có nhiệm vụ mới.</small>';
   }
 
   // ---------------- Bảng Điều Khiển Quán Ăn Làng: Ready, Set, Cook! ----------------

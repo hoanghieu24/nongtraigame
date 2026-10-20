@@ -53,6 +53,7 @@ export class Sim {
   reload() {
     migrate(this.st);
     this.ti = timeInfo(this.st.world.t, CFG);
+    this.systems.quest.refreshCalendar();
     // Khi nạp save, chỉ giữ người chơi host kết nối, các người chơi cũ đánh dấu offline để không chặn qua đêm
     const hostId = this.st.meta.hostId;
     for (const p of Object.values(this.st.players)) {

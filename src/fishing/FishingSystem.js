@@ -17,6 +17,7 @@ export class FishingSystem {
       if (bait && f.rarity === 'junk') w *= 0.3;
       if (f.time === 'night') w *= ti.night ? 2 : 0.35;
       if (rain && f.rarity !== 'junk') w *= 1.25;
+      if (sim.st.daily?.fortune === 2 && ['rare', 'epic', 'legend'].includes(f.rarity)) w *= 1.25;
       return w;
     });
   }
