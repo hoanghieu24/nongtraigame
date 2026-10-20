@@ -44,6 +44,7 @@ export class ZombieSystem {
       this.step(z, dt, sp, tx, tz);
       if (z.bite <= 0) for (const p of players) if (dist(p.x, p.z, z.x, z.z) < 1.3) {
         z.bite = 2.4; const dx = p.x - z.x, dz = p.z - z.z, d = Math.hypot(dx, dz) || 1;
+        sim.sys('vitals')?.damage(p.id, 18);
         sim.fx({ k: 'knock', to: p.id, dx: dx / d, dz: dz / d, power: 7 }); sim.fx({ k: 'float', x: p.x, z: p.z, y: 3, text: '🧟 Bị cắn!', color: '#9be26b' }); sim.fx({ k: 'sfx', name: 'zombie', x: p.x, z: p.z }); sim.toast(p.id, '🧟 Zombie cắn bạn! Đánh nó bằng dép (phím 6) hoặc chạy vào nhà ngủ', 'warn'); sim.game({ type: 'bitten', pid: p.id });
       }
       const r = Math.hypot(z.x, z.z); if (r > WORLD.R + 6) { z.x *= (WORLD.R + 6) / r; z.z *= (WORLD.R + 6) / r; }

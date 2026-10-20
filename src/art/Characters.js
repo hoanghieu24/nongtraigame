@@ -8,16 +8,26 @@ const shade2 = (h, f = 0.72) => new THREE.Color(h).multiplyScalar(f).getHex();
 
 const hairParts = (style, hair) => {
   const darkHair = shade2(hair, 0.85);
+  const shineHair = shade2(hair, 1.12);
   const p = [
     bake(S(0.45, 16, 12), hair, [0, 0.08, -0.03], [0, 0, 0], [1.03, 0.96, 1.04]),
     bake(Ca(0.11, 0.22), darkHair, [-0.16, 0.22, 0.34], [0.3, 0.2, -0.95], [1, 1, 0.55]),
     bake(Ca(0.11, 0.22), hair, [0.14, 0.23, 0.35], [0.3, -0.2, 0.9], [1, 1, 0.55]),
+    bake(Ca(0.034, 0.12), shineHair, [0.16, 0.35, 0.16], [0.1, 0, -0.5], [0.65, 1, 0.45]),
+    bake(Ca(0.026, 0.09), shineHair, [-0.08, 0.39, 0.11], [0.1, 0, 0.3], [0.65, 1, 0.45]),
     bake(Ca(0.09, 0.18), darkHair, [-0.36, 0.04, 0.14], [0.15, 0, -0.15], [0.6, 1, 0.8]),
     bake(Ca(0.09, 0.18), darkHair, [0.36, 0.04, 0.14], [0.15, 0, 0.15], [0.6, 1, 0.8]),
     bake(B(0.68, 0.28, 0.22, 0.08), darkHair, [0, -0.06, -0.32], [-0.15, 0, 0]),
   ];
-  if (style === 'long') p.push(bake(Ca(0.28, 0.48), hair, [0, -0.22, -0.28], [0.1, 0, 0], [1.18, 1, 0.55]));
-  if (style === 'bun') p.push(bake(S(0.2, 10, 8), hair, [0, 0.52, -0.12]));
+  if (style === 'long') p.push(
+    bake(Ca(0.28, 0.48), hair, [0, -0.22, -0.28], [0.1, 0, 0], [1.18, 1, 0.55]),
+    bake(Ca(0.105, 0.3), hair, [-0.35, -0.17, -0.04], [0.08, 0, -0.12], [1, 1.2, 0.72]),
+    bake(Ca(0.105, 0.3), hair, [0.35, -0.17, -0.04], [0.08, 0, 0.12], [1, 1.2, 0.72])
+  );
+  if (style === 'bun') p.push(
+    bake(S(0.2, 10, 8), hair, [0, 0.52, -0.12]),
+    bake(To(0.17, 0.025, 5, 12), shade2(hair, 0.72), [0, 0.51, -0.12], [Math.PI / 2, 0, 0])
+  );
   if (style === 'beard') {
     p.push(
       bake(S(0.28, 10, 8), hair, [0, -0.28, 0.24], [0, 0, 0], [1.1, 0.8, 0.75]),
@@ -56,6 +66,8 @@ export function buildCharacter(look = {}) {
       bake(Cy(0.135, 0.135, 0.07, 10), shade2(pants, 0.82), [0, -0.5, 0]),
       bake(B(0.25, 0.16, 0.38, 0.06), 0x343a44, [0, -0.6, 0.05]),
       bake(B(0.27, 0.065, 0.41, 0.025), 0xf6f6f6, [0, -0.69, 0.05]),
+      bake(B(0.19, 0.055, 0.24, 0.025), 0x59616c, [0, -0.535, 0.14]),
+      ...[-0.01, 0.04, 0.09].map((z) => bake(B(0.12, 0.012, 0.018, 0.005), 0xf3ead8, [0, -0.51, z + 0.13])),
     ]), MAT.lit, { receive: false }));
     return g;
   };
@@ -63,11 +75,16 @@ export function buildCharacter(look = {}) {
 
   // Thân áo hoodie / áo khoác có cổ mũ, dây kéo, gấu áo và ba lô đeo vai chân thực
   rig.torso = new THREE.Group(); rig.torso.position.set(0, 0.74, 0); body.add(rig.torso);
+  const trim = shade2(outfit, 0.72), lightTrim = shade2(outfit, 1.16);
   rig.torso.add(M(merge([
     bake(Ca(0.32, 0.38), outfit, [0, 0.38, 0], [0, 0, 0], [1.04, 1, 0.84]),
     bake(Cy(0.33, 0.33, 0.1, 14), shade2(outfit, 0.82), [0, 0.1, 0], [0, 0, 0], [1.02, 1, 0.82]),
     bake(B(0.44, 0.24, 0.08, 0.04), shade2(outfit, 0.86), [0, 0.26, 0.25]),
     bake(To(0.24, 0.075, 7, 16), shade2(outfit, 0.88), [0, 0.68, -0.04], [Math.PI / 2 + 0.18, 0, 0]),
+    bake(B(0.035, 0.48, 0.025, 0.01), trim, [0, 0.39, 0.278]),
+    bake(B(0.15, 0.15, 0.035, 0.025), trim, [-0.18, 0.2, 0.29]),
+    bake(B(0.105, 0.025, 0.012, 0.006), lightTrim, [-0.18, 0.28, 0.313]),
+    bake(S(0.022, 6, 5), 0xffd574, [0.02, 0.57, 0.29]),
     bake(B(0.075, 0.54, 0.32, 0.02), 0x2b2623, [-0.21, 0.4, -0.02]),
     bake(B(0.075, 0.54, 0.32, 0.02), 0x2b2623, [0.21, 0.4, -0.02]),
     bake(B(0.48, 0.54, 0.25, 0.09), 0x38322e, [0, 0.38, -0.32]),
@@ -98,18 +115,24 @@ export function buildCharacter(look = {}) {
     bake(Cy(0.12, 0.14, 0.18, 10), shade2(skin, 0.92), [0, -0.42, 0]),
     bake(S(0.43, 18, 14), skin, [0, 0, 0], [0, 0, 0], [1.0, 0.98, 0.98]),
     earL, earR,
-    bake(S(0.052, 7, 5), shade2(skin, 0.9), [0, -0.05, 0.42]),
-    bake(S(0.075, 7, 5), 0xff94a2, [-0.26, -0.09, 0.35], [0, 0, 0], [1.1, 0.6, 0.5]),
-    bake(S(0.075, 7, 5), 0xff94a2, [0.26, -0.09, 0.35], [0, 0, 0], [1.1, 0.6, 0.5]),
+    bake(S(0.04, 8, 6), shade2(skin, 0.88), [0, -0.055, 0.418], [0, 0, 0], [0.8, 0.72, 0.65]),
+    bake(S(0.012, 6, 5), shade2(skin, 1.12), [0.012, -0.045, 0.443]),
+    bake(S(0.056, 8, 6), 0xffaab0, [-0.26, -0.09, 0.335], [0, 0, 0], [1.1, 0.62, 0.42]),
+    bake(S(0.056, 8, 6), 0xffaab0, [0.26, -0.09, 0.335], [0, 0, 0], [1.1, 0.62, 0.42]),
+    bake(S(0.035, 6, 5), 0xffc1c4, [-0.43, -0.02, 0.055], [0, 0, 0], [0.45, 0.75, 0.35]),
+    bake(S(0.035, 6, 5), 0xffc1c4, [0.43, -0.02, 0.055], [0, 0, 0], [0.45, 0.75, 0.35]),
     ...hairParts(look.style || 'short', hair)
   ]), MAT.lit, { receive: false }));
 
   rig.eyes = new THREE.Group(); rig.eyes.position.set(0, 0.05, 0);
   rig.eyes.add(M(merge([
-    bake(S(0.068, 8, 6), 0x231a12, [-0.155, 0, 0.39], [0, 0, 0], [0.92, 1.22, 0.55]),
-    bake(S(0.068, 8, 6), 0x231a12, [0.155, 0, 0.39], [0, 0, 0], [0.92, 1.22, 0.55]),
-    bake(S(0.024, 5, 4), 0xffffff, [-0.14, 0.038, 0.425]),
-    bake(S(0.024, 5, 4), 0xffffff, [0.17, 0.038, 0.425])
+    ...[-0.155, 0.155].flatMap((x) => [
+      bake(S(0.068, 10, 8), 0xfff4e9, [x, 0, 0.398], [0, 0, 0], [0.92, 1.08, 0.58]),
+      bake(S(0.037, 9, 7), look.eyes ?? 0x704832, [x, 0, 0.431], [0, 0, 0], [0.92, 1.05, 0.58]),
+      bake(S(0.019, 8, 6), 0x1d1715, [x, -0.001, 0.45], [0, 0, 0], [0.92, 1.05, 0.58]),
+      bake(S(0.012, 6, 5), 0xffffff, [x - 0.009, 0.016, 0.461]),
+      bake(S(0.005, 5, 4), 0xffffff, [x + 0.012, -0.009, 0.461]),
+    ])
   ]), MAT.lit, { cast: false, receive: false }));
   rig.head.add(rig.eyes);
   if (look.glasses) rig.head.add(M(merge([bake(To(0.105, 0.016, 5, 14), 0x6b5b4a, [-0.155, 0.05, 0.41]), bake(To(0.105, 0.016, 5, 14), 0x6b5b4a, [0.155, 0.05, 0.41]), bake(Cy(0.012, 0.012, 0.1, 4), 0x6b5b4a, [0, 0.06, 0.41], [0, 0, Math.PI / 2])]), MAT.lit, { cast: false, receive: false }));
@@ -125,6 +148,7 @@ export function buildCharacter(look = {}) {
   rig.carry = new THREE.Group(); rig.carry.position.set(0, 0.55, 0.62); rig.carry.visible = false; rig.torso.add(rig.carry);
   rig.carry.add(M(merge([bake(Cy(0.3, 0.26, 0.05, 14), 0xffffff), bake(S(0.2, 9, 7), 0xff9a4d, [0, 0.12, 0], [0, 0, 0], [1, 0.7, 1]), bake(S(0.09, 7, 5), 0x7bc96a, [0.08, 0.22, 0.05])]), MAT.lit, { receive: false }));
   rig.shadow = blobShadow(1.65); root.add(rig.shadow);
+  rig.head.scale.setScalar(0.9);
   root.scale.setScalar(scale); rig.height = 2.35 * scale;
   return rig;
 }
@@ -180,6 +204,8 @@ const ANIMS = {
   sit: (t) => ({ y: -0.34, ll: -1.42, lr: -1.42, tx: -0.06, arx: -0.32, alx: -0.32, hx: Math.sin(t * 1.1) * 0.04 }),
   stumble: (t) => ({ tx: -0.35, y: Math.abs(Math.sin(t * 16)) * 0.1, arz: -1.1, alz: 1.1, arx: -0.4 * Math.sin(t * 18), alx: 0.4 * Math.sin(t * 18), hx: -0.3, ll: Math.sin(t * 14) * 0.6, lr: -Math.sin(t * 14) * 0.6 }),
   wave: (t) => ({ arx: -2.8, arz: -0.6 + Math.sin(t * 10) * 0.4, alx: 0.0 }),
+  hug: (t) => ({ y: Math.sin(t * 3) * 0.025, alx: -1.5, arx: -1.5, alz: -0.62, arz: 0.62, tx: -0.12, hx: -0.12 }),
+  kiss: (t) => ({ y: Math.sin(t * 4) * 0.02, arx: -2.65, arz: -0.32 + Math.sin(t * 9) * 0.12, alx: -1.1, alz: 0.28, hx: -0.24, tx: -0.08 }),
   scared: (t) => ({ y: Math.abs(Math.sin(t * 16)) * 0.14, ll: Math.sin(t * 18) * 0.9, lr: -Math.sin(t * 18) * 0.9, arx: -2.5, alx: -2.5, arz: -0.5, alz: 0.5, tx: 0.2 }),
   zombie: (t) => ({ alx: -1.45 + Math.sin(t * 2) * 0.12, arx: -1.45 + Math.sin(t * 2 + 1) * 0.12, tx: 0.18, hx: 0.25 + Math.sin(t * 1.3) * 0.1, hz: Math.sin(t * 1.7) * 0.18, ll: Math.sin(t * 5) * 0.5, lr: -Math.sin(t * 5) * 0.5, y: Math.abs(Math.sin(t * 5)) * 0.04 }),
   // Tư thế nằm trên giường: lưng đặt êm trên đệm, đầu tựa gối nhẹ, ngực thở đều, hai tay đặt nhẹ trên bụng
@@ -187,7 +213,7 @@ const ANIMS = {
   think: (t) => ({ hz: 0.2, hx: -0.1, arx: -1.9, arz: 0.1, alx: 0.0 }),
 };
 export const ANIM_NAMES = Object.keys(ANIMS);
-const MOOD = { sad: 'sad', surprised: 'surprised', celebrate: 'happy', jump: 'happy', attack: 'angry', scared: 'surprised', stumble: 'surprised', pet: 'happy', harvest: 'happy', reel: 'angry', wave: 'happy', sit: 'happy' };
+const MOOD = { sad: 'sad', surprised: 'surprised', celebrate: 'happy', jump: 'happy', attack: 'angry', scared: 'surprised', stumble: 'surprised', pet: 'happy', harvest: 'happy', reel: 'angry', wave: 'happy', hug: 'happy', kiss: 'happy', sit: 'happy' };
 export function poseCharacter(rig, anim, dt, speed = 0, airY = 0) {
   rig.t += dt; const t = rig.t;
   const fn = ANIMS[anim] || ANIMS.idle, tgt = { ...P0, ...fn(t, speed) }, p = rig.pose, k = 14;

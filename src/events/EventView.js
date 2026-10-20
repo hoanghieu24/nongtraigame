@@ -15,7 +15,7 @@ const FG = {
 };
 const ufoGeo = () => merge([bake(Lathe([[0, -0.5], [1.2, -0.3], [3, 0], [3.4, 0.25], [2.4, 0.5], [0, 0.6]], 18), 0xb8c0d0), bake(S(1.2, 12, 8), 0x8fe8ff, [0, 0.7, 0], [0, 0, 0], [1, 0.8, 1]), ...Array.from({ length: 8 }, (_, i) => bake(S(0.2, 6, 5), i % 2 ? 0xffe066 : 0xff6ab0, [Math.cos((i / 8) * 6.283) * 2.8, 0.15, Math.sin((i / 8) * 6.283) * 2.8]))]);
 export class EventView {
-  constructor(ctx) { this.ctx = ctx; this.group = new THREE.Group(); ctx.scene.add(this.group); this.pick = new Map(); this.forage = new Map(); this.geo = {}; this.sparkT = 0; this.trail = 0;
+  constructor(ctx) { this.ctx = ctx; this.group = new THREE.Group(); ctx.scene.add(this.group); this.pick = new Map(); this.forage = new Map(); this.geo = {};
     this.ufo = null; this.meteor = null; this.crater = null; }
   fg(kind) { return (this.geo[kind] ||= FG[kind]()); }
   update(dt, st, t, focus, localArea) {
@@ -46,7 +46,7 @@ export class EventView {
     } else if (this.ufo) { this.group.remove(this.ufo); this.ufo = null; }
     if (metE) {
       const k = (wt - (metE.impact - 4.4)) / 4.4;
-      if (!metE.landed && k >= 0 && k < 1) { if (!this.meteor) { this.meteor = glowSprite(0xffa040, 7, 1); this.meteor.userData.glow = 0; this.group.add(this.meteor); } this.meteor.position.set(metE.x - 40 * (1 - k), 70 * (1 - k) * (1 - k) + 1.5, metE.z - 28 * (1 - k)); this.trail -= dt; if (this.trail <= 0) { this.trail = 0.04; this.ctx.fx.burst('sparkle', this.meteor.position.x, this.meteor.position.y, this.meteor.position.z, 2); } }
+      if (!metE.landed && k >= 0 && k < 1) { if (!this.meteor) { this.meteor = glowSprite(0xffa040, 7, 1); this.meteor.userData.glow = 0; this.group.add(this.meteor); } this.meteor.position.set(metE.x - 40 * (1 - k), 70 * (1 - k) * (1 - k) + 1.5, metE.z - 28 * (1 - k)); }
       else if (this.meteor) { this.group.remove(this.meteor); this.meteor = null; }
       if (metE.landed) { if (!this.crater) { this.crater = glowSprite(0xff9a50, 5, 0.9); this.crater.userData.glow = 0; this.crater.position.set(metE.x, 0.5, metE.z); this.group.add(this.crater); } this.crater.material.opacity = 0.5 + 0.3 * Math.sin(t * 3); }
     } else { if (this.meteor) { this.group.remove(this.meteor); this.meteor = null; } if (this.crater) { this.group.remove(this.crater); this.crater = null; } }

@@ -12,5 +12,18 @@ export const ANIMALS = {
 };
 export const BUYABLE_ANIMALS = ['chicken', 'duck', 'rabbit', 'sheep', 'pig', 'goat', 'cow'];
 
+// Bán vật nuôi trưởng thành được khoảng 55% giá mua; thú con rẻ hơn,
+// còn thú Vàng và vật nuôi được chăm tốt có giá cao hơn.
+export const animalSalePrice = (animal) => {
+  const def = animal && ANIMALS[animal.type];
+  if (!def || animal.type === 'dog' || def.cost <= 0) return 0;
+  const growth = Math.max(0, Math.min(1, animal.growth ?? 1));
+  const maturity = 0.65 + growth * 0.35;
+  const care = animal.happy >= 0.85 ? 1.1 : 1;
+  const golden = animal.golden ? 3 : 1;
+  const ready = animal.ready ? 1.12 : 1;
+  return Math.max(1, Math.round(def.cost * 0.55 * maturity * care * golden * ready));
+};
+
 // Đói: đầy → đói lả mất ~7 phút; đói lả rồi còn `grace` giây để cho ăn, quá hạn thì vật nuôi chết đói.
 export const STARVE = { hungry: 0.7, critical: 0.97, grace: 150, warn: 60, rate: 420 };

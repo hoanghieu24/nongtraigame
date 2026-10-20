@@ -33,7 +33,15 @@ export class Session {
     this.hostProfile = profile;
     if (state) { store.replace(migrate(state)); store.state.meta.hostId = profile.id; } else store.replace(createGameState({ farmName, hostId: profile.id, roomCode: makeCode() }));
     if (!store.state.meta.roomCode) store.state.meta.roomCode = makeCode(); if (!store.state.meta.hostId) store.state.meta.hostId = profile.id;
-    const sim = new Sim(store); this.game.sim = sim; if (state) sim.reload(); sim.addPlayer(profile); this.role = 'host'; this.myId = profile.id; this.code = store.state.meta.roomCode;
+    const sim = new Sim(store); this.game.sim = sim; if (state) sim.reload();
+    // Đảm bảo chỉ người chơi Host là online khi mở phòng; các người chơi cũ được reset offline
+    for (const p of Object.values(store.state.players)) {
+      if (p.id !== profile.id) {
+        p.connected = false;
+        p.sleeping = false;
+      }
+    }
+    sim.addPlayer(profile); this.role = 'host'; this.myId = profile.id; this.code = store.state.meta.roomCode;
     sim.bus.on('fx', (f) => this.routeFx(f)); store.flush(); this.openRoom(); return sim;
   }
   openRoom() {
@@ -78,6 +86,7 @@ export class Session {
     if (m.t === 'cmd') { const r = sim.exec(pid, m.c); if (r.ok === false && r.msg) { /* toast gửi riêng qua fx */ } }
     else if (m.t === 'pose') sim.setPose(pid, { x: m.p[0], z: m.p[1], rot: m.p[2], anim: m.p[3], tool: m.p[4], area: m.p[5], spd: m.p[6] });
     else if (m.t === 'chat') this.broadcastChat(pid, String(m.text).slice(0, 120));
+    else if (m.t === 'rsc') this.game.rsc2d?.handleNetworkMsg(pid, m.d);
     else if (m.t === 'bye') this.dropPeerBy(w.id);
   }
   dropPeerBy(id) { const p = this.peers.get(id); if (!p) return; this.peers.delete(id); this.game.sim?.removePlayer(p.pid); this.game.persist?.(false); this.game.ui?.toast(`${this.store.state.players[p.pid]?.name || 'Bạn bè'} đã rời đi (Đã lưu Cloud 💾)`, 'info'); }
@@ -119,6 +128,7 @@ export class Session {
       case 'poses': for (const k in m.P) if (k !== this.myId) this.remotePoses[k] = m.P[k]; for (const k in this.remotePoses) if (!(k in m.P) && k !== this.myId) delete this.remotePoses[k]; break;
       case 'fx': this.game.handleFx(m.f); break;
       case 'chat': this.game.onChat(m); break;
+      case 'rsc': this.game.rsc2d?.handleNetworkMsg('host', m.d); break;
     }
   }
   applySnap(m) {
@@ -149,6 +159,10 @@ export class Session {
     else if (this.role === 'client') this.sendRaw?.({ t: 'pose', p: [r2(pose.x), r2(pose.z), r2(pose.rot), pose.anim, pose.tool, pose.area, r2(pose.spd || 0)] });
   }
   sendChat(text) { if (this.role === 'host') this.broadcastChat(this.myId, text.slice(0, 120)); else this.sendRaw?.({ t: 'chat', text }); }
+  sendRsc(data) {
+    if (this.role === 'host') this.broadcast({ t: 'rsc', d: data });
+    else if (this.role === 'client') this.sendRaw?.({ t: 'rsc', d: data });
+  }
   tick(dt) {
     const g = this.game;
     if (this.role === 'client') { g.store.state.world.t += dt; return; }
@@ -158,7 +172,10 @@ export class Session {
     if (this.peers.size) {
       if (A.snap >= 1 / CFG.NET.SNAP_HZ) { A.snap = 0; this.broadcast(this.makeSnap()); }
       if (A.pose >= 1 / CFG.NET.POSE_HZ) { A.pose = 0; const P = {}; for (const [id, p] of Object.entries(g.sim.poses)) P[id] = { x: r2(p.x), z: r2(p.z), rot: r2(p.rot || 0), anim: p.anim, tool: p.tool, area: p.area, spd: r2(p.spd || 0) }; this.broadcast({ t: 'poses', P }); }
-      const now = performance.now(); for (const [id, p] of [...this.peers]) if (p.w.kind === 'bc' && now - p.seen > 9000) this.dropPeerBy(id);
+      const now = performance.now();
+      for (const [id, p] of [...this.peers]) {
+        if (now - p.seen > 12000) this.dropPeerBy(id);
+      }
     } else this.store.flush();
   }
 }

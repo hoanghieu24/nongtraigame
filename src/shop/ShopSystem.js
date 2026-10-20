@@ -1,11 +1,11 @@
 import { shopCatalog } from '../data/shops.js';
-import { ANIMALS } from '../data/animals.js';
+import { ANIMALS, animalSalePrice } from '../data/animals.js';
 import { PENS, VILLAGE, SPOTS } from '../data/layout.js';
 import { fail, ok } from '../core/result.js';
 import { addTo } from '../inventory/Inventory.js';
 
 export class ShopSystem {
-  constructor(sim) { this.sim = sim; this.id = 'shop'; this.cmds = { buy: (p, c) => this.buy(p, c) }; }
+  constructor(sim) { this.sim = sim; this.id = 'shop'; this.cmds = { buy: (p, c) => this.buy(p, c), sellAnimal: (p, c) => this.sellAnimal(p, c) }; }
   shopPos(shop) {
     if (VILLAGE.shops[shop]) return VILLAGE.shops[shop];
     if (shop === 'delivery') return this.sim.st.npcs.delivery || SPOTS.merchant;
@@ -65,5 +65,26 @@ export class ShopSystem {
     sim.toast(pid, `Đã mua ${row.icon} ${row.name}${qty > 1 ? ' ×' + qty : ''}!${row.kind === 'furn' ? ' Mở 🔨 để đặt.' : ''}`, 'good');
     sim.game({ type: 'buy', pid, kind: row.kind, ref: row.ref, shop });
     return ok();
+  }
+  sellAnimal(pid, { id }) {
+    const { sim } = this, animal = sim.st.animals[id], pos = this.shopPos('animal');
+    if (!pos || !sim.near(pid, pos.x, pos.z, 12)) return fail('Đưa vật nuôi tới Cửa Hàng Thú Cưng ở Làng để bán nhé!');
+    if (!animal) return fail('Không tìm thấy vật nuôi này nữa!');
+    if (animal.type === 'dog') return fail('Cún là bạn đồng hành, không thể đem bán!');
+    const price = animalSalePrice(animal);
+    if (!price) return fail('Vật nuôi này chưa thể bán được.');
+    const { x, z, name } = animal;
+    sim.sys('animal').remove(animal.id);
+    sim.sys('economy').earn(pid, price);
+    sim.st.players[pid].stats.sell++;
+    sim.touch('players.' + pid);
+    sim.game({ type: 'sell', pid, item: 'animal', n: 1 });
+    sim.sys('prog').addXp(pid, Math.min(25, 2 + Math.floor(price / 100)));
+    sim.fx({ k: 'burst', kind: 'coins', x, z, y: 1.8, n: 12 });
+    sim.fx({ k: 'float', x, z, y: 2.5, text: `+${price} 🪙`, color: '#ffc02e', to: pid });
+    sim.fx({ k: 'sfx', name: 'coin', x, z });
+    sim.toast(pid, `Đã bán ${name} được ${price} 🪙!`, 'good');
+    sim.game({ type: 'animal_sold', pid, animal: animal.type, n: 1, coins: price });
+    return ok({ price });
   }
 }

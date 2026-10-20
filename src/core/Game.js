@@ -172,7 +172,7 @@ export class Game {
   onDisconnected() { this.ui.toast('Mất kết nối với chủ farm 😢', 'warn'); this.backToMenu(); }
   backToMenu() { if (this.rsc2d?.active) this.rsc2d.close(); this.persist(false); this.session.stop(); this.mode = 'menu'; this.store.replace(createGameState()); this.sim = new Sim(this.store, { seed: 11 }); this.closeBuild(); this.setView('3D'); this.area = 'out'; this.rig.interior = false; this.rig.sleeping = false; this.ui.exitGame(); }
   persist(sync) { if (this.mode !== 'play' || this.session.role === 'none') return; const role = this.session.role === 'host' ? 'host' : 'guest'; if (sync) this.save.saveSync(this.store.state, role); else this.save.save(this.store.state, role); }
-  onChat(m) { this.ui.chatAdd(m); this.views.player.say(m.from, m.text); if (/^(😘|💋|❤️|🥰|😍|💕)$/.test(m.text)) { const ps = this.poses()[m.from]; if (ps) { this.fx.burst('hearts', ps.x, 2.8, ps.z, 9); this.audio.sfx('pop', ps.x, ps.z); } } }
+  onChat(m) { this.ui.chatAdd(m); this.views.player.say(m.from, m.text); if (/^(😘|💋|❤️|🥰|😍|💕|🤗|🫂)$/.test(m.text)) { const ps = this.poses()[m.from]; if (ps) { this.fx.burst('hearts', ps.x, 2.8, ps.z, 5); this.audio.sfx('pop', ps.x, ps.z); } } }
   startFishGame(f) { if (this.fishGameOn) return; this.fishGameOn = true; this.ui.fish.start(f.diff ?? 0.3, (win) => { this.fishGameOn = false; this.session.send({ type: 'fish.finish', win }); }); }
   async confetti() { try { const { default: c } = await import('canvas-confetti'); c({ particleCount: 40, spread: 70, origin: { y: 0.55 }, disableForReducedMotion: true, ticks: 120 }); } catch { /* ignore */ } }
   handleFx(f) {

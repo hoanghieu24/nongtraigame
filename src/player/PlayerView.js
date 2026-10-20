@@ -26,7 +26,7 @@ export class PlayerView {
     this.lineGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(6 * 3), 3)); this.lines = new Map(); }
   say(pid, text) { const r = this.rigs.get(pid); if (!r) return; if (r.bubble) r.head.remove(r.bubble); r.bubble = spriteOf(bubbleTexture(text), 3.4, 1.13); r.bubble.position.y = 1.6; r.head.add(r.bubble); r.bubbleT = 4.5; }
   make(p) {
-    const preset = PRESETS[p.char.preset % PRESETS.length], rig = buildCharacter({ skin: preset.skin, hair: preset.hair, style: preset.style, outfit: preset.outfit, hat: p.char.hat }); rig.pid = p.id; rig.vx = 0; rig.vz = 0; rig.vr = 0; rig.init = false; rig.glass = false;
+    const preset = PRESETS[p.char.preset % PRESETS.length], rig = buildCharacter({ skin: preset.skin, hair: preset.hair, eyes: preset.eyes, style: preset.style, outfit: preset.outfit, hat: p.char.hat }); rig.pid = p.id; rig.vx = 0; rig.vz = 0; rig.vr = 0; rig.init = false; rig.glass = false;
     rig.tag = spriteOf(nameTexture(p.name, PLAYER_COLORS[p.slot % 4]), 2.6, 0.65); rig.tag.position.y = 3.15; rig.root.add(rig.tag); rig.tagName = p.name; this.group.add(rig.root); return rig;
   }
   update(dt, st, poses, localId, localArea, t) {

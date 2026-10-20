@@ -13,7 +13,7 @@ export const FURN = {
   painting:  { name: 'Tranh Đồng Quê',    icon: '🖼️', cat: 'decor',     price: 70,  lvl: 1, w: 1, d: 1, areas: ['house'], wall: true },
   rug:       { name: 'Thảm Len Tròn',     icon: '🟠', cat: 'decor',     price: 90,  lvl: 1, w: 3, d: 2, areas: ['house'], flat: true },
   clock:     { name: 'Đồng Hồ Cúc Cu',    icon: '🕰️', cat: 'decor',     price: 110, lvl: 2, w: 1, d: 1, areas: ['house'], wall: true },
-  aquarium:  { name: 'Bể Cá Cảnh',        icon: '🐠', cat: 'decor',     price: 380, lvl: 3, w: 2, d: 1, areas: ['house'] },
+  aquarium:  { name: 'Bể Cá Cảnh',        icon: '🐠', cat: 'decor',     price: 3200, lvl: 3, w: 2, d: 1, areas: ['house'] },
   toys:      { name: 'Hộp Đồ Chơi',       icon: '🧸', cat: 'decor',     price: 55,  lvl: 1, w: 1, d: 1, areas: ['house'] },
   gnome:     { name: 'Chú Lùn Vườn',      icon: '🎅', cat: 'decor',     price: 75,  lvl: 1, w: 1, d: 1, areas: ['farm'] },
   fence:     { name: 'Hàng Rào Gỗ',       icon: '🚧', cat: 'outdoor',   price: 20,  lvl: 1, w: 2, d: 1, areas: ['farm'] },
@@ -23,10 +23,10 @@ export const FURN = {
   lantern:   { name: 'Đèn Lồng Treo',     icon: '🎃', cat: 'outdoor',   price: 65,  lvl: 1, w: 1, d: 1, areas: ['farm'], glow: true },
   tree:      { name: 'Cây Bóng Mát',      icon: '🌳', cat: 'outdoor',   price: 100, lvl: 2, w: 2, d: 2, areas: ['farm'] },
   scarecrow: { name: 'Bù Nhìn Ngố',       icon: '🧟', cat: 'outdoor',   price: 150, lvl: 2, w: 1, d: 1, areas: ['farm'] },
-  swing:     { name: 'Xích Đu Gỗ',        icon: '🎠', cat: 'outdoor',   price: 260, lvl: 3, w: 2, d: 2, areas: ['farm'] },
-  fountain:  { name: 'Đài Phun Nước',     icon: '⛲', cat: 'outdoor',   price: 700, lvl: 4, w: 3, d: 3, areas: ['farm'] },
-  pond:      { name: 'Hồ Cá Koi Mini',    icon: '🪷', cat: 'outdoor',   price: 320, lvl: 3, w: 3, d: 3, areas: ['farm'] },
-  gold_gnome:{ name: 'Chú Lùn Vàng (hiếm)', icon: '👑', cat: 'decor',   price: 1600, lvl: 1, w: 1, d: 1, areas: ['farm', 'house'], rare: true },
+  swing:     { name: 'Xích Đu Gỗ',        icon: '🎠', cat: 'outdoor',   price: 1800, lvl: 3, w: 2, d: 2, areas: ['farm'] },
+  fountain:  { name: 'Đài Phun Nước',     icon: '⛲', cat: 'outdoor',   price: 6500, lvl: 4, w: 3, d: 3, areas: ['farm'] },
+  pond:      { name: 'Hồ Cá Koi Mini',    icon: '🪷', cat: 'outdoor',   price: 2600, lvl: 3, w: 3, d: 3, areas: ['farm'] },
+  gold_gnome:{ name: 'Chú Lùn Vàng (hiếm)', icon: '👑', cat: 'decor',   price: 12000, lvl: 5, w: 1, d: 1, areas: ['farm', 'house'], rare: true },
 };
 export const FURN_LIST = Object.keys(FURN);
 

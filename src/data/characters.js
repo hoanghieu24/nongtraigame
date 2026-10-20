@@ -1,12 +1,12 @@
 export const PRESETS = [
-  { id: 0, name: 'Hiếu 💙',         defaultName: 'Hiếu',  avatar: '👦',   skin: 0xe4b08a, hair: 0x22252a, style: 'short', outfit: 0x3b82f6, hat: 'cap' },
-  { id: 1, name: 'Huyền 💖',        defaultName: 'Huyền', avatar: '👧',   skin: 0xf6d2b6, hair: 0x5a3b26, style: 'long',  outfit: 0xf472b6, hat: 'flower' },
-  { id: 2, name: 'Cô Bé Dâu Tây',   defaultName: 'Huyền', avatar: '👩‍🌾', skin: 0xf6d2b6, hair: 0xb4553a, style: 'bun',   outfit: 0xf06a8d, hat: 'straw' },
-  { id: 3, name: 'Chàng Đầu Bếp',   defaultName: 'Hiếu',  avatar: '🧑‍🍳', skin: 0xf4d3b9, hair: 0x2c2c2c, style: 'short', outfit: 0xf4f4f4, hat: 'chef' },
-  { id: 4, name: 'Bác Cao Bồi',     avatar: '🤠',   skin: 0xc98f66, hair: 0x3d2b1f, style: 'beard', outfit: 0xb0643a, hat: 'cowboy' },
-  { id: 5, name: 'Cậu Bé Bí Ngô',   avatar: '👦',   skin: 0xd8a27c, hair: 0x1f1a17, style: 'short', outfit: 0xff9a2e, hat: 'beanie' },
-  { id: 6, name: 'Bà Tiên Vườn',    avatar: '👵',   skin: 0xf3d6c0, hair: 0xe8e8e8, style: 'bun',   outfit: 0xb49bd9, hat: 'flower' },
-  { id: 7, name: 'Cún Chong Chóng', avatar: '🧒',   skin: 0xe9b995, hair: 0x60472f, style: 'short', outfit: 0x4cc3b0, hat: 'prop' },
+  { id: 0, name: 'Hiếu 💙',         defaultName: 'Hiếu',  avatar: '👦',   skin: 0xe4b08a, hair: 0x22252a, eyes: 0x493024, style: 'short', outfit: 0x3b82f6, hat: 'cap' },
+  { id: 1, name: 'Huyền 💖',        defaultName: 'Huyền', avatar: '👧',   skin: 0xf6d2b6, hair: 0x5a3b26, eyes: 0x4b3529, style: 'long',  outfit: 0xf472b6, hat: 'flower' },
+  { id: 2, name: 'Cô Bé Dâu Tây',   defaultName: 'Huyền', avatar: '👩‍🌾', skin: 0xf6d2b6, hair: 0xb4553a, eyes: 0x54362b, style: 'bun',   outfit: 0xf06a8d, hat: 'straw' },
+  { id: 3, name: 'Chàng Đầu Bếp',   defaultName: 'Hiếu',  avatar: '🧑‍🍳', skin: 0xf4d3b9, hair: 0x2c2c2c, eyes: 0x44332a, style: 'short', outfit: 0xf4f4f4, hat: 'chef' },
+  { id: 4, name: 'Bác Cao Bồi',     avatar: '🤠',   skin: 0xc98f66, hair: 0x3d2b1f, eyes: 0x38251f, style: 'beard', outfit: 0xb0643a, hat: 'cowboy' },
+  { id: 5, name: 'Cậu Bé Bí Ngô',   avatar: '👦',   skin: 0xd8a27c, hair: 0x1f1a17, eyes: 0x493024, style: 'short', outfit: 0xff9a2e, hat: 'beanie' },
+  { id: 6, name: 'Bà Tiên Vườn',    avatar: '👵',   skin: 0xf3d6c0, hair: 0xe8e8e8, eyes: 0x718095, style: 'bun',   outfit: 0xb49bd9, hat: 'flower' },
+  { id: 7, name: 'Cún Chong Chóng', avatar: '🧒',   skin: 0xe9b995, hair: 0x60472f, eyes: 0x493024, style: 'short', outfit: 0x4cc3b0, hat: 'prop' },
 ];
 export const HATS = {
   none:   { name: 'Không đội',        price: 0,   icon: '🙂' },

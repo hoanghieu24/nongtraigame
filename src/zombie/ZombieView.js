@@ -22,7 +22,7 @@ export class ZombieView {
       let anim = 'zombie';
       if (z.st === 'eat') anim = 'plant'; else if (z.st === 'stun') anim = 'stumble';
       if (z.st === 'dead') { r.t0 += dt; r.root.rotation.x = -Math.min(1.5, r.t0 * 5); anim = 'sad'; }
-      if (z.st === 'burn') { r.t0 += dt; r.root.scale.setScalar(Math.max(0.2, 1 - r.t0 * 0.35)); if (Math.random() < dt * 8) this.ctx.fx.burst('smoke', r.vx, 1.5, r.vz, 1); }
+      if (z.st === 'burn') { r.t0 += dt; r.root.scale.setScalar(Math.max(0.2, 1 - r.t0 * 0.35)); if (Math.random() < dt * 2) this.ctx.fx.burst('smoke', r.vx, 1.5, r.vz, 1); }
       poseCharacter(r, anim, dt, 0.3); r.hpBar.visible = z.st !== 'dead' && z.st !== 'burn'; r.glow.material.opacity = 0.3 + 0.12 * Math.sin(t * 4);
     }
     for (const [id, r] of this.map) if (!seen.has(id)) { this.group.remove(r.root); this.map.delete(id); }

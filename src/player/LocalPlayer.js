@@ -67,35 +67,43 @@ export class LocalPlayer {
       return;
     }
     this.sitting = null; this.jumpY = 0; this.vy = 0; this.jumping = false;
-    this.inBed = { id: bed.id, bx: bed.x, bz: bed.z, t: 0, dreaming: false };
+    this.inBed = { id: bed.id, bx: bed.x, bz: bed.z, t: 0, dreaming: true, sleepCycle: st.world.sleepCycle || 0 };
     this.x = INTERIOR.ox + bed.x;
     this.z = INTERIOR.oz + bed.z + 0.72;
     this.rot = 0;
     this.vx = this.vz = 0;
     g.rig.sleeping = true;
     g.audio.sfx('sad');
-    g.fx.burst('zzz', this.x, 1.4, INTERIOR.oz + bed.z - 0.6, 3);
+    const el = document.getElementById('eyelids');
+    if (el) { el.classList.remove('opening'); el.classList.add('closing'); }
+    this.send({ type: 'clock.sleep' });
   }
 
   startDream() {
-    if (!this.inBed || this.inBed.dreaming) return;
+    if (!this.inBed) return;
     if (!this.canSleep(this.g.store.state)) {
       this.g.audio.sfx('fail');
       this.g.ui.toast('Chỉ có thể đi ngủ vào buổi tối (từ 18:00) hoặc khi trời đang mưa! 🌙🌧️', 'warn');
       this.wakeUp();
       return;
     }
-    this.inBed.dreaming = true;
+    this.send({ type: 'clock.sleep' });
+  }
+  // Theo dõi trạng thái ngủ từ host: qua đêm xong (sleeping bị host tắt) thì mở mắt & đứng dậy
+  watchSleep(me, st) {
+    const b = this.inBed; if (!b) return;
     const el = document.getElementById('eyelids');
-    if (el) { el.classList.remove('opening'); el.classList.add('closing'); }
-    setTimeout(() => {
-      if (!this.inBed) return;
-      this.send({ type: 'clock.sleep' });
-      setTimeout(() => {
-        if (el) { el.classList.remove('closing'); el.classList.add('opening'); setTimeout(() => el.classList.remove('opening'), 1400); }
-        this.wakeUp();
-      }, 650);
-    }, 1500);
+    const openEyes = () => { if (el) { el.classList.remove('closing'); el.classList.add('opening'); setTimeout(() => el.classList.remove('opening'), 1400); } };
+    // Đồng hồ nhảy vọt hoặc host chuyển sleeping về false => đêm đã qua, chào buổi sáng!
+    if ((st.world.sleepCycle || 0) !== b.sleepCycle || (b.confirmed && !me.sleeping)) {
+      openEyes();
+      this.wakeUp();
+      return;
+    }
+    if (me.sleeping && !b.confirmed) {
+      b.confirmed = true;
+      openEyes();
+    }
   }
   wakeUp() {
     if (!this.inBed && !this.me?.sleeping) return;
@@ -103,7 +111,7 @@ export class LocalPlayer {
     this.inBed = null;
     this.g.rig.sleeping = false;
     const el = document.getElementById('eyelids');
-    if (el) el.classList.remove('closing');
+    if (el) { el.classList.remove('closing'); el.classList.add('opening'); setTimeout(() => el.classList.remove('opening'), 800); }
     if (this.me?.sleeping) this.send({ type: 'clock.wake' });
     this.x = INTERIOR.ox + b.bx - 1.35;
     this.z = INTERIOR.oz + b.bz + 0.4;
@@ -145,9 +153,11 @@ export class LocalPlayer {
 
     if (this.inBed || me.sleeping) {
       const bx = this.inBed?.bx ?? me.bed?.x ?? 4.5, bz = this.inBed?.bz ?? me.bed?.z ?? -3.0;
-      if (this.inBed && !this.inBed.dreaming) {
+      this.watchSleep(me, st);
+      if (!this.inBed && !me.sleeping) return;
+      if (this.inBed) {
         this.inBed.t += dt;
-        if (this.inBed.t > 0.6 && Math.hypot(ax.x, ax.y) > 0.55) {
+        if (this.inBed.t > 1.2 && Math.hypot(ax.x, ax.y) > 0.85) {
           this.wakeUp();
           return;
         }

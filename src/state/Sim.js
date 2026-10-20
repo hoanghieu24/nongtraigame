@@ -23,6 +23,7 @@ import { NpcSystem } from '../npc/NpcSystem.js';
 import { WorldItemsSystem } from '../inventory/WorldItemsSystem.js';
 import { WeatherSystem } from '../world/WeatherSystem.js';
 import { ZombieSystem } from '../zombie/ZombieSystem.js';
+import { VitalsSystem } from '../player/VitalsSystem.js';
 
 export class Sim {
   constructor(store, opts = {}) {
@@ -32,7 +33,7 @@ export class Sim {
     this.poses = {};                   // pid -> {x,z,rot,area,anim,tool} (tạm thời, không lưu)
     this.systems = {}; this.handlers = {};
     this.ti = timeInfo(store.state.world.t, CFG);
-    const list = [ClockSystem, WeatherSystem, ZombieSystem, ProgressionSystem, EconomySystem, ShopSystem, FarmingSystem, AnimalSystem, FishingSystem, ThiefSystem, CombatSystem, RestaurantSystem, FurnitureSystem, QuestSystem, EventSystem, NpcSystem, WorldItemsSystem];
+    const list = [ClockSystem, WeatherSystem, VitalsSystem, ZombieSystem, ProgressionSystem, EconomySystem, ShopSystem, FarmingSystem, AnimalSystem, FishingSystem, ThiefSystem, CombatSystem, RestaurantSystem, FurnitureSystem, QuestSystem, EventSystem, NpcSystem, WorldItemsSystem];
     for (const C of list) {
       const s = new C(this); this.systems[s.id] = s;
       for (const [name, fn] of Object.entries(s.cmds || {})) this.handlers[`${s.id}.${name}`] = fn.bind(s);
@@ -49,7 +50,18 @@ export class Sim {
     // Trang bị sẵn nội thất đầy đủ, ấm cúng và cân đối từ STARTER_FURNITURE
     Object.assign(st.furniture, JSON.parse(JSON.stringify(STARTER_FURNITURE)));
   }
-  reload() { migrate(this.st); this.ti = timeInfo(this.st.world.t, CFG); }   // sau khi load save
+  reload() {
+    migrate(this.st);
+    this.ti = timeInfo(this.st.world.t, CFG);
+    // Khi nạp save, chỉ giữ người chơi host kết nối, các người chơi cũ đánh dấu offline để không chặn qua đêm
+    const hostId = this.st.meta.hostId;
+    for (const p of Object.values(this.st.players)) {
+      if (p.id !== hostId) {
+        p.connected = false;
+        p.sleeping = false;
+      }
+    }
+  }
 
   // ---- người chơi ----
   addPlayer(profile) {
@@ -103,6 +115,7 @@ export class Sim {
   tick(dt) {
     this.ti = timeInfo(this.st.world.t, CFG);
     this.systems.clock.tick(dt);
+    this.systems.vitals.tick(dt);
     this.systems.weather.tick(dt);
     this.systems.farm.tick(dt);
     this.systems.animal.tick(dt);

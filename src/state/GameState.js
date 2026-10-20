@@ -27,7 +27,7 @@ export function createGameState({ farmName = 'Nông Trại Gia Đình', hostId =
   return {
     v: CFG.VERSION,
     meta: { farmName, hostId, roomCode, created: Date.now(), playTime: 0, tut: 0, fresh: true, seed: (Math.random() * 1e9) | 0 },
-    world: { t: 0, day: 1, season: 0, weather: 'clear', weatherUntil: 150 },
+    world: { t: 0, day: 1, season: 0, weather: 'clear', weatherUntil: 150, sleepCycle: 0 },
     farm: { level: 1, xp: 0, houseLevel: 1, plotRows: PLOT.rows0, areas: { forest: false, beach: false, mountain: false } },
     players: {},
     crops: {},
@@ -70,7 +70,7 @@ export function createPlayer(id, profile = {}, slot = 0, farmLevel = 1) {
   return {
     id, slot, name: (profile.name || 'Nông Dân').slice(0, 14), avatar: preset.avatar,
     char: { preset: preset.id, hat },
-    money: CFG.START_COINS, xp: 0, level: 1,
+    money: CFG.START_COINS, xp: 0, level: 1, food: 100, hp: 100,
     sel: 'carrot', weapon: 'slipper', weapons: Object.keys(WEAPONS).filter((k) => WEAPONS[k].lvl <= farmLevel && !WEAPONS[k].consumes || k === 'slipper'),
     hats: [...new Set(['straw', hat])],
     stats: { harvest: 0, water: 0, plant: 0, feed: 0, pet: 0, collect: 0, fish: 0, sell: 0, cook: 0, chase: 0, serve: 0 },
@@ -115,7 +115,12 @@ export function migrate(st) {
   if (!st.farm.plotRows || st.farm.plotRows < PLOT.rows0 || (st.farm.plotRows === 4 && st.farm.level === 1 && !Object.values(st.crops || {}).some((c) => c.r >= PLOT.rows0))) {
     st.farm.plotRows = PLOT.rows0;
   }
-  for (const p of Object.values(st.players)) { p.connected = false; delete p.fishing; delete p.carry; }
+  for (const p of Object.values(st.players)) {
+    if (!Number.isFinite(p.food)) p.food = 100;
+    if (!Number.isFinite(p.hp)) p.hp = 100;
+    p.food = Math.max(0, Math.min(100, p.food)); p.hp = Math.max(1, Math.min(100, p.hp));
+    p.connected = false; delete p.fishing; delete p.carry;
+  }
   st.v = CFG.VERSION;
   return st;
 }

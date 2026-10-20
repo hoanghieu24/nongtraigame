@@ -573,14 +573,60 @@ export class ReadySetCook2D {
     this.spawnInitialGuests();
     this.guestSpawnT = this.difficultyDirector ? this.difficultyDirector.orderSpawnInterval : 25.0;
 
-    // Nhân vật người chơi YOU + Mèo Phụ Bếp Mimi (có thể bật/tắt bất kỳ lúc nào!)
+    // Thiết lập 2 Đầu Bếp Chibi: Hiếu 💙 & Huyền 💖 cùng nấu ăn trong 1 Nhà Hàng!
+    this.setupChefs();
+    this.sousChef = {
+      x: 1025,
+      y: 590,
+      dir: 0,
+      animT: 0,
+      actionT: 2.2,
+      statusText: '🐱 Mimi sẵn sàng!',
+    };
+  }
+
+  get isHost() {
+    return this.g?.session?.role !== 'client';
+  }
+
+  get myChef() {
+    return this.chefs?.[this.myChefIndex] || this.chefs?.[0];
+  }
+
+  setupChefs() {
+    const st = this.g?.store?.state;
+    const players = Object.values(st?.players || {}).filter((p) => p.connected);
+    const isClient = this.g?.session?.role === 'client';
+
+    const pHost = players.find((p) => p.id === st?.meta?.hostId) || players[0] || { name: 'Hiếu' };
+    const pGuest = players.find((p) => p.id !== pHost.id) || players[1] || { name: 'Huyền' };
+
+    const hostName = pHost.name || 'Hiếu';
+    const guestName = pGuest.name || 'Huyền';
+
     this.chefs = [
       {
-        id: 'you',
-        name: 'YOU',
-        tagColor: '#ff5252',
-        costume: 'dino',
-        x: 560,
+        id: pHost.id || 'hieu',
+        name: hostName.includes('Huyền') ? 'Huyền 💖' : 'Hiếu 💙',
+        tagColor: hostName.includes('Huyền') ? '#f472b6' : '#38bdf8',
+        costume: hostName.includes('Huyền') ? 'huyen' : 'hieu',
+        x: 520,
+        y: 525,
+        vx: 0,
+        vy: 0,
+        dir: -Math.PI / 2,
+        hold: null,
+        target: null,
+        path: [],
+        chopT: 0,
+        stepDustT: 0,
+      },
+      {
+        id: pGuest.id || 'huyen',
+        name: guestName.includes('Hiếu') ? 'Hiếu 💙' : 'Huyền 💖',
+        tagColor: guestName.includes('Hiếu') ? '#38bdf8' : '#f472b6',
+        costume: guestName.includes('Hiếu') ? 'hieu' : 'huyen',
+        x: 620,
         y: 525,
         vx: 0,
         vy: 0,
@@ -592,14 +638,8 @@ export class ReadySetCook2D {
         stepDustT: 0,
       },
     ];
-    this.sousChef = {
-      x: 1025,
-      y: 590,
-      dir: 0,
-      animT: 0,
-      actionT: 2.2,
-      statusText: '🐱 Mimi sẵn sàng!',
-    };
+
+    this.myChefIndex = isClient ? 1 : 0;
   }
 
   // Tổng số bát/đĩa sạch hiện đang sẵn sàng sử dụng (trên 2 quầy ghép + trên kệ bát sạch)
@@ -702,9 +742,10 @@ export class ReadySetCook2D {
     this.guests.push(g0, g1, g2);
   }
 
-  open() {
+  open({ announce = true } = {}) {
     if (this.active) return;
     this.active = true;
+    this.setupChefs();
     this.g.input?.resetTouch?.();
     document.getElementById('app')?.classList.add('rsc2d-open');
     this.syncHiDpi();
@@ -712,9 +753,17 @@ export class ReadySetCook2D {
     if (this.g.ui?.panel) this.g.ui.close();
     this.g.session.send({ type: 'rest.shift', on: true, silent: true });
     this.g.audio.sfx('bell');
+
+    if (announce && this.g.session && this.g.session.role !== 'none') {
+      if (this.isHost) {
+        this.g.session.sendRsc({ kind: 'host_opened', hostName: this.chefs[0]?.name });
+      } else {
+        this.g.session.sendRsc({ kind: 'client_join', clientName: this.chefs[1]?.name });
+      }
+    }
   }
 
-  close() {
+  close({ announce = true } = {}) {
     if (!this.active) return;
     this.active = false;
     this.touchJoy.active = false;
@@ -728,14 +777,194 @@ export class ReadySetCook2D {
       this.g.local.vx = 0;
       this.g.local.vz = 0;
     }
-    this.g.session.send({ type: 'rest.shift', on: false, silent: true });
+    if (announce) {
+      this.g.session.send({ type: 'rest.shift', on: false, silent: true });
+      if (this.g.session && this.g.session.role !== 'none') {
+        this.g.session.sendRsc({ kind: this.isHost ? 'host_closed' : 'chef_leave', chefIndex: this.myChefIndex });
+      }
+    }
     if (this.earned > 0) {
-      this.g.ui.toast(`🎉 Bạn đã mang +${fmt(this.earned)} 🪙 (${'⭐'.repeat(Math.max(1, this.starsReached))}) từ Quán Ăn Ready, Set, Cook! về Làng!`, 'good');
+      this.g.ui.toast(`🎉 Cả hai đã mang +${fmt(this.earned)} 🪙 (${'⭐'.repeat(Math.max(1, this.starsReached))}) từ Quán Ăn Ready, Set, Cook! về Làng!`, 'good');
     }
   }
 
   addFloat(x, y, text, color = '#ffe066') {
     this.floats.push({ x, y, text, color, life: 1.6, maxLife: 1.6 });
+    if (this.isHost && this.g?.session?.role === 'host') {
+      this.g.session.sendRsc({ kind: 'float', x, y, text, color });
+    }
+  }
+
+  getSyncState() {
+    return {
+      timer: this.timer,
+      earned: this.earned,
+      served: this.served,
+      combo: this.combo,
+      feverT: this.feverT,
+      starsReached: this.starsReached,
+      cleanPlateStack: this.cleanPlateStack,
+      boards: this.boards,
+      plates: this.plates,
+      ovens: this.ovens,
+      drinkMachine: this.drinkMachine,
+      sink: this.sink,
+      tables: this.tables.map((t) => ({
+        id: t.id,
+        dirty: t.dirty,
+        dirtyCount: t.dirtyCount,
+        eatingDish: t.eatingDish,
+        tip: t.tip,
+        guest: t.guest
+          ? {
+              id: t.guest.id,
+              kind: t.guest.kind,
+              styleIdx: t.guest.styleIdx,
+              dish: t.guest.dish,
+              phase: t.guest.phase,
+              patience: t.guest.patience,
+              maxPatience: t.guest.maxPatience,
+              x: t.guest.x,
+              y: t.guest.y,
+            }
+          : null,
+      })),
+      guests: this.guests
+        .filter((g) => g.phase === 'walk_in' || g.phase === 'walk_out')
+        .map((g) => ({
+          id: g.id,
+          kind: g.kind,
+          styleIdx: g.styleIdx,
+          dish: g.dish,
+          phase: g.phase,
+          patience: g.patience,
+          maxPatience: g.maxPatience,
+          x: g.x,
+          y: g.y,
+          targetTable: g.targetTable,
+        })),
+      chef0: {
+        x: Math.round(this.chefs[0]?.x || 520),
+        y: Math.round(this.chefs[0]?.y || 525),
+        vx: Math.round(this.chefs[0]?.vx || 0),
+        vy: Math.round(this.chefs[0]?.vy || 0),
+        dir: Math.round((this.chefs[0]?.dir || 0) * 100) / 100,
+        hold: this.chefs[0]?.hold || null,
+        chopT: this.chefs[0]?.chopT || 0,
+      },
+      chef1Hold: this.chefs[1]?.hold || null,
+    };
+  }
+
+  applySyncState(st) {
+    if (!st) return;
+    this.timer = st.timer;
+    this.earned = st.earned;
+    this.served = st.served;
+    this.combo = st.combo;
+    this.feverT = st.feverT;
+    this.starsReached = st.starsReached;
+    this.cleanPlateStack = st.cleanPlateStack;
+    if (st.boards) this.boards = st.boards;
+    if (st.plates) this.plates = st.plates;
+    if (st.ovens) this.ovens = st.ovens;
+    if (st.drinkMachine) this.drinkMachine = st.drinkMachine;
+    if (st.sink) this.sink = st.sink;
+
+    if (st.tables) {
+      for (let i = 0; i < st.tables.length; i++) {
+        const src = st.tables[i], dst = this.tables[i];
+        if (!src || !dst) continue;
+        dst.dirty = src.dirty;
+        dst.dirtyCount = src.dirtyCount;
+        dst.eatingDish = src.eatingDish;
+        dst.tip = src.tip;
+        if (src.guest) {
+          if (!dst.guest || dst.guest.id !== src.guest.id) {
+            dst.guest = { ...src.guest };
+          } else {
+            Object.assign(dst.guest, src.guest);
+          }
+        } else {
+          dst.guest = null;
+        }
+      }
+    }
+
+    if (st.guests) {
+      this.guests = st.guests.map((sg) => {
+        const existing = this.guests.find((g) => g.id === sg.id);
+        return existing ? Object.assign(existing, sg) : { ...sg };
+      });
+    }
+
+    if (st.chef0 && this.chefs[0]) {
+      this.chefs[0].x = st.chef0.x;
+      this.chefs[0].y = st.chef0.y;
+      this.chefs[0].vx = st.chef0.vx;
+      this.chefs[0].vy = st.chef0.vy;
+      this.chefs[0].dir = st.chef0.dir;
+      this.chefs[0].hold = st.chef0.hold;
+      this.chefs[0].chopT = st.chef0.chopT;
+    }
+
+    if (st.chef1Hold !== undefined && this.chefs[1]) {
+      this.chefs[1].hold = st.chef1Hold;
+    }
+  }
+
+  broadcastState() {
+    if (!this.g?.session || this.g.session.role !== 'host') return;
+    this.g.session.sendRsc({ kind: 'sync', state: this.getSyncState() });
+  }
+
+  handleNetworkMsg(sender, msg) {
+    if (!msg) return;
+    if (msg.kind === 'host_opened') {
+      if (!this.active && this.g.session?.role === 'client') this.open({ announce: false });
+      if (!this.active) {
+        this.g.ui?.toast(`👨‍🍳 ${msg.hostName || 'Hiếu'} đang mở Quán Ăn! Hãy bấm [Vào Quán] để nấu cùng nhé! 🍕`, 'good');
+      }
+    } else if (msg.kind === 'client_join') {
+      if (this.isHost) {
+        if (!this.active) this.open({ announce: false });
+        this.addFloat(640, 220, `💖 ${msg.clientName || 'Huyền'} đã vào Bếp! Cùng nấu ăn nào!`, '#ff80ab');
+        this.broadcastState();
+      }
+    } else if (msg.kind === 'client_move') {
+      if (this.isHost && this.chefs[1]) {
+        this.chefs[1].x = msg.x;
+        this.chefs[1].y = msg.y;
+        this.chefs[1].vx = msg.vx;
+        this.chefs[1].vy = msg.vy;
+        this.chefs[1].dir = msg.dir;
+        this.chefs[1].chopT = msg.chopT;
+      }
+    } else if (msg.kind === 'client_act') {
+      if (this.isHost && this.chefs[1]) {
+        const st = STATIONS[msg.stationId];
+        const tb = this.tables.find((t) => t.id === msg.tableId);
+        this.interactAt(this.chefs[1], st, tb);
+      }
+    } else if (msg.kind === 'client_tap') {
+      if (this.isHost && this.chefs[1]) {
+        const st = STATIONS[msg.stationId];
+        const tb = this.tables.find((t) => t.id === msg.tableId);
+        this.setChefDestination(this.chefs[1], msg.tx, msg.ty, st, tb);
+      }
+    } else if (msg.kind === 'sync') {
+      if (!this.isHost) {
+        this.applySyncState(msg.state);
+      }
+    } else if (msg.kind === 'float') {
+      this.floats.push({ x: msg.x, y: msg.y, text: msg.text, color: msg.color, life: 1.6, maxLife: 1.6 });
+    } else if (msg.kind === 'host_closed' && !this.isHost) {
+      this.close({ announce: false });
+    } else if (msg.kind === 'chef_leave') {
+      const idx = msg.chefIndex;
+      const chef = this.chefs?.[idx];
+      this.addFloat(640, 220, `👋 ${chef?.name || 'Đầu bếp'} đã tạm ra ngoài`, '#ffd54f');
+    }
   }
 
   spawnParticles(x, y, kind, count = 6) {
@@ -797,10 +1026,19 @@ export class ReadySetCook2D {
     c.path = this.findPath(c.x, c.y, destX, destY);
     c.target = { x: destX, y: destY, station, table };
     this.tapRipples.push({ x: station ? station.x : table ? table.x : destX, y: station ? station.y : table ? table.y : destY, r: 8, alpha: 1 });
+    if (!this.isHost && c === this.myChef && this.g?.session?.role === 'client') {
+      this.g.session.sendRsc({
+        kind: 'client_tap',
+        tx,
+        ty,
+        stationId: station?.id,
+        tableId: table?.id,
+      });
+    }
   }
 
   onCanvasTap(sx, sy) {
-    const me = this.chefs[0];
+    const me = this.myChef;
 
     // 1. Nút ✕ góc trên phải hoặc nút Pause || -> Thoát ra Làng!
     if ((sx > 1145 && sy < 95) || (sx > 1050 && sx < 1140 && sy > 32 && sy < 110)) {
@@ -1143,6 +1381,13 @@ export class ReadySetCook2D {
 
   // Context-Aware Interaction — uỷ quyền cho PlayerController (cùng StationLogic & CrisisManager)
   interactAt(c, st, tb) {
+    if (!this.isHost && c === this.myChef && this.g?.session?.role === 'client') {
+      this.g.session.sendRsc({
+        kind: 'client_act',
+        stationId: st?.id,
+        tableId: tb?.id,
+      });
+    }
     return this.playerController.interact(c, st, tb);
   }
 
@@ -1150,7 +1395,6 @@ export class ReadySetCook2D {
     this.earned += amount;
     this.addFloat(x, y, label, '#ffe066');
     const sim = this.g?.session?.sim || this.g?.sim;
-    const myId = this.g?.myId;
     while (this.starsReached < STAR_GOALS.length && this.earned >= STAR_GOALS[this.starsReached]) {
       this.starsReached++;
       const bonus = this.starsReached * 80;
@@ -1162,14 +1406,16 @@ export class ReadySetCook2D {
       this.addFloat(640, 150, `⭐ ĐẠT ${this.starsReached} SAO! +${bonus}🪙 & +1 🎡 Vé Quay May Mắn!`, '#ffd54f');
       this.g.audio.sfx('levelup');
     }
-    if (sim && myId && sim.st.players[myId]) {
-      sim.sys('economy').earn(myId, amount, { bonus: true });
-      sim.sys('prog').addXp(myId, 10);
-      if (sim.st.daily) {
-        sim.st.daily.activity = Math.min(100, (sim.st.daily.activity || 0) + 8);
-        sim.touch('daily');
+    if (sim) {
+      for (const p of sim.connected()) {
+        sim.sys('economy').earn(p.id, amount, { bonus: true });
+        sim.sys('prog').addXp(p.id, 10);
+        if (sim.st.daily) {
+          sim.st.daily.activity = Math.min(100, (sim.st.daily.activity || 0) + 8);
+          sim.touch('daily');
+        }
+        sim.touch('players.' + p.id);
       }
-      sim.touch('players.' + myId);
     }
   }
 
@@ -1237,18 +1483,20 @@ export class ReadySetCook2D {
     if (!this.active) return;
     this.t += dt;
 
-    // 0. CẬP NHẬT DIFFICULTY DIRECTOR (180s Match Timer: Phase 1 Easy -> Phase 2 Rush Hour -> Phase 3 Level Up)
-    if (this.difficultyDirector) {
-      this.difficultyDirector.update(dt);
-      this.timer = this.difficultyDirector.getRemainingSeconds();
+    // 0. CẬP NHẬT DIFFICULTY DIRECTOR (Chỉ Host chạy match timer & phase để đồng bộ)
+    if (this.isHost) {
+      if (this.difficultyDirector) {
+        this.difficultyDirector.update(dt);
+        this.timer = this.difficultyDirector.getRemainingSeconds();
+      }
     }
     if (this.feverT > 0) this.feverT = Math.max(0, this.feverT - dt);
 
-    const me = this.chefs[0];
+    const me = this.myChef;
     me.chopT = Math.max(0, (me.chopT || 0) - dt);
 
     // 1. TIẾN TRÌNH RÓT TRÀ SỮA TRÂN CHÂU (Chuẩn 2.5 giây)
-    if (this.drinkMachine.state === 'pouring') {
+    if (this.isHost && this.drinkMachine.state === 'pouring') {
       this.drinkMachine.prog = Math.min(1, this.drinkMachine.prog + dt / POUR_SECONDS);
       if (Math.random() < dt * 6) {
         this.spawnParticles(STATIONS.drink.x, STATIONS.drink.y + 8, 'bubble', 1);
@@ -1265,11 +1513,17 @@ export class ReadySetCook2D {
       }
     }
 
-    // 2. CẬP NHẬT CÁC HÀNH ĐỘNG GIỮ TƯƠNG TÁC (3.0s Thái trên Thớt, 2.0s Rửa Bát ở Bồn, 5.0s Nướng + 5.0s Chờ + 3.0s Chữa Cháy)
-    this.playerController.updateHoldActions(me, dt, (chef, st) => this.isChefNearStation(chef, st));
+    // 2. CẬP NHẬT CÁC HÀNH ĐỘNG GIỮ TƯƠNG TÁC
+    if (this.isHost) {
+      for (const c of this.chefs) {
+        this.playerController.updateHoldActions(c, dt, (chef, st) => this.isChefNearStation(chef, st));
+      }
+    } else {
+      this.playerController.updateHoldActions(me, dt, (chef, st) => this.isChefNearStation(chef, st));
+    }
 
-    // 3. Mèo Phụ Bếp Mimi hỗ trợ nhận order
-    if (this.helperOn && this.sousChef) {
+    // 3. Mèo Phụ Bếp Mimi hỗ trợ nhận order (Chỉ Host chạy logic thưởng và đổi trạng thái)
+    if (this.isHost && this.helperOn && this.sousChef) {
       this.sousChef.animT += dt * 6;
       this.sousChef.actionT -= dt;
       if (this.sousChef.actionT <= 0) {
@@ -1280,6 +1534,31 @@ export class ReadySetCook2D {
           waitTb.guest.patience = waitTb.guest.maxPatience;
           this.sousChef.statusText = '🐱 Mimi đã ghi order!';
           this.rewardCoins(15, waitTb.x, waitTb.y - 28, '🐱 Mimi nhận order +15 🪙');
+        }
+      }
+    }
+
+    // Đồng bộ mạng Co-op 2 người chơi Hiếu & Huyền trong cùng 1 Quán Ăn
+    if (this.g.session && this.g.session.role !== 'none') {
+      if (this.isHost) {
+        this.netSyncT = (this.netSyncT || 0) + dt;
+        if (this.netSyncT >= 0.05) {
+          this.netSyncT = 0;
+          this.broadcastState();
+        }
+      } else {
+        this.netSendT = (this.netSendT || 0) + dt;
+        if (this.netSendT >= 0.04) {
+          this.netSendT = 0;
+          this.g.session.sendRsc({
+            kind: 'client_move',
+            x: Math.round(me.x),
+            y: Math.round(me.y),
+            vx: Math.round(me.vx),
+            vy: Math.round(me.vy),
+            dir: Math.round((me.dir || 0) * 100) / 100,
+            chopT: me.chopT || 0,
+          });
         }
       }
     }
@@ -1359,72 +1638,90 @@ export class ReadySetCook2D {
       }
     }
 
-    // 4. TỐC ĐỘ SINH ĐƠN HÀNG THEO DIFFICULTY DIRECTOR (Phase 1: 25s/đơn, Phase 2 & 3: 12s/đơn)
-    this.guestSpawnT -= dt;
-    const activeGuests = this.guests.filter((g) => g.phase !== 'walk_out').length;
-    if (this.guestSpawnT <= 0 || activeGuests === 0) {
-      this.guestSpawnT = this.difficultyDirector ? this.difficultyDirector.orderSpawnInterval : 25.0;
-      if (activeGuests < 4) this.spawnCustomer();
-    }
+    // 4 & 5: Chỉ Host điều khiển khách hàng và tiến trình ăn để tránh sai lệch giữa 2 máy
+    if (this.isHost) {
+      // 4. TỐC ĐỘ SINH ĐƠN HÀNG THEO DIFFICULTY DIRECTOR (Phase 1: 25s/đơn, Phase 2 & 3: 12s/đơn)
+      this.guestSpawnT -= dt;
+      const activeGuests = this.guests.filter((g) => g.phase !== 'walk_out').length;
+      if (this.guestSpawnT <= 0 || activeGuests === 0) {
+        this.guestSpawnT = this.difficultyDirector ? this.difficultyDirector.orderSpawnInterval : 25.0;
+        if (activeGuests < 4) this.spawnCustomer();
+      }
 
-    // 5. CẬP NHẬT KHÁCH HÀNG & TỐC ĐỘ GIẢM KIÊN NHẪN THEO PHASE (Phase 1: 1.0x, Phase 2 & 3: 1.3x nhanh hơn 30%!)
-    const patienceMult = this.difficultyDirector ? this.difficultyDirector.patienceDecayMultiplier : 1.0;
-    for (let i = this.guests.length - 1; i >= 0; i--) {
-      const g = this.guests[i];
-      g.animT += dt * 7;
-      const tb = this.tables[g.tableId];
-      if (g.phase === 'walk_in') {
-        const wp = g.path && g.path.length ? g.path[0] : { x: tb.seatX, y: tb.seatY };
-        const dx = wp.x - g.x, dy = wp.y - g.y;
-        const d = Math.hypot(dx, dy);
-        if (d > 8) {
-          g.x += (dx / d) * 145 * dt;
-          g.y += (dy / d) * 145 * dt;
-        } else if (g.path && g.path.length > 1) {
-          g.path.shift();
-        } else {
-          g.x = tb.seatX;
-          g.y = tb.seatY;
-          g.path = [];
-          g.phase = 'wait_order';
-          this.g.audio.sfx('bell');
+      // 5. CẬP NHẬT KHÁCH HÀNG & TỐC ĐỘ GIẢM KIÊN NHẪN THEO PHASE (Phase 1: 1.0x, Phase 2 & 3: 1.3x nhanh hơn 30%!)
+      const patienceMult = this.difficultyDirector ? this.difficultyDirector.patienceDecayMultiplier : 1.0;
+      for (let i = this.guests.length - 1; i >= 0; i--) {
+        const g = this.guests[i];
+        g.animT += dt * 7;
+        const tb = this.tables[g.tableId];
+        if (g.phase === 'walk_in') {
+          const wp = g.path && g.path.length ? g.path[0] : { x: tb.seatX, y: tb.seatY };
+          const dx = wp.x - g.x, dy = wp.y - g.y;
+          const d = Math.hypot(dx, dy);
+          if (d > 8) {
+            g.x += (dx / d) * 145 * dt;
+            g.y += (dy / d) * 145 * dt;
+          } else if (g.path && g.path.length > 1) {
+            g.path.shift();
+          } else {
+            g.x = tb.seatX;
+            g.y = tb.seatY;
+            g.path = [];
+            g.phase = 'wait_order';
+            this.g.audio.sfx('bell');
+          }
+        } else if (g.phase === 'wait_order' || g.phase === 'ordered') {
+          g.patience -= dt * 0.35 * patienceMult;
+          if (g.phase === 'wait_order' && g.maxPatience - g.patience > 4.0) {
+            g.phase = 'ordered';
+          }
+          if (g.patience <= 0) {
+            g.phase = 'walk_out';
+            g.path = this.findPath(tb.walkX ?? tb.standX, tb.walkY ?? tb.standY, DOOR_POS.x, DOOR_POS.y);
+            tb.guest = null;
+            this.combo = 0;
+            this.g.audio.sfx('fail');
+          }
+        } else if (g.phase === 'eating') {
+          g.eatT -= dt;
+          if (g.eatT <= 0) {
+            tb.eatingDish = null;
+            tb.dirty = true;
+            tb.dirtyCount = (tb.dirtyCount || 0) + 1;
+            tb.tip = 35;
+            tb.guest = null;
+            g.phase = 'walk_out';
+            g.x = tb.walkX ?? tb.standX;
+            g.y = tb.walkY ?? tb.standY;
+            g.path = this.findPath(g.x, g.y, DOOR_POS.x, DOOR_POS.y);
+          }
+        } else if (g.phase === 'walk_out') {
+          const wp = g.path && g.path.length ? g.path[0] : DOOR_POS;
+          const dx = wp.x - g.x, dy = wp.y - g.y;
+          const d = Math.hypot(dx, dy);
+          if (d > 10) {
+            g.x += (dx / d) * 155 * dt;
+            g.y += (dy / d) * 155 * dt;
+          } else if (g.path && g.path.length > 1) {
+            g.path.shift();
+          } else {
+            this.guests.splice(i, 1);
+          }
         }
-      } else if (g.phase === 'wait_order' || g.phase === 'ordered') {
-        g.patience -= dt * 0.35 * patienceMult;
-        if (g.phase === 'wait_order' && g.maxPatience - g.patience > 4.0) {
-          g.phase = 'ordered';
-        }
-        if (g.patience <= 0) {
-          g.phase = 'walk_out';
-          g.path = this.findPath(tb.walkX ?? tb.standX, tb.walkY ?? tb.standY, DOOR_POS.x, DOOR_POS.y);
-          tb.guest = null;
-          this.combo = 0;
-          this.g.audio.sfx('fail');
-        }
-      } else if (g.phase === 'eating') {
-        g.eatT -= dt;
-        if (g.eatT <= 0) {
-          tb.eatingDish = null;
-          tb.dirty = true;
-          tb.dirtyCount = (tb.dirtyCount || 0) + 1;
-          tb.tip = 35;
-          tb.guest = null;
-          g.phase = 'walk_out';
-          g.x = tb.walkX ?? tb.standX;
-          g.y = tb.walkY ?? tb.standY;
-          g.path = this.findPath(g.x, g.y, DOOR_POS.x, DOOR_POS.y);
-        }
-      } else if (g.phase === 'walk_out') {
-        const wp = g.path && g.path.length ? g.path[0] : DOOR_POS;
-        const dx = wp.x - g.x, dy = wp.y - g.y;
-        const d = Math.hypot(dx, dy);
-        if (d > 10) {
-          g.x += (dx / d) * 155 * dt;
-          g.y += (dy / d) * 155 * dt;
-        } else if (g.path && g.path.length > 1) {
-          g.path.shift();
-        } else {
-          this.guests.splice(i, 1);
+      }
+    } else {
+      // Client: cập nhật hoạt ảnh và bước đi mềm mại của khách theo dữ liệu từ Host
+      for (const g of this.guests) {
+        g.animT += dt * 7;
+        if (g.phase === 'walk_in' || g.phase === 'walk_out') {
+          const tb = this.tables[g.tableId];
+          const wp = g.path && g.path.length ? g.path[0] : (g.phase === 'walk_in' ? { x: tb?.seatX ?? g.x, y: tb?.seatY ?? g.y } : DOOR_POS);
+          const dx = wp.x - g.x, dy = wp.y - g.y;
+          const d = Math.hypot(dx, dy);
+          if (d > 6) {
+            g.x += (dx / d) * 145 * dt;
+            g.y += (dy / d) * 145 * dt;
+          }
         }
       }
     }
@@ -2298,7 +2595,7 @@ export class ReadySetCook2D {
   }
 
   drawNavigationPathAndHighlights(ctx) {
-    const me = this.chefs[0];
+    const me = this.myChef;
     if (me.path && me.path.length > 0) {
       ctx.save();
       ctx.strokeStyle = 'rgba(255, 235, 130, 0.78)';
@@ -2712,29 +3009,51 @@ export class ReadySetCook2D {
       }
     }
 
-    // Đuôi khủng long cam vẫy phía sau + Thân & Mũ Khủng Long Cam có mắt cúc áo chuẩn ảnh gốc!
+    const isHuyen = c.costume === 'huyen' || (c.name && c.name.includes('Huyền'));
+    const bodyColor = isHuyen ? '#ec4899' : '#e67e22';
+    const tailColor = isHuyen ? '#db2777' : '#d36415';
+    const pantsColor = isHuyen ? '#f472b6' : '#1e88e5';
+    const headColor = isHuyen ? '#f472b6' : '#f08a2b';
+    const eyeRingColor = isHuyen ? '#831843' : '#784212';
+    const spikeColor = isHuyen ? '#be185d' : '#873600';
+
+    // Đuôi khủng long vẫy phía sau + Thân & Mũ có phân biệt Hiếu & Huyền
     const tailWag = moving ? Math.sin(this.t * 18) * 4 : Math.sin(this.t * 5) * 1.5;
-    this.inkCircle(ctx, 12 + tailWag * 0.3, 14, 14, '#d36415');
-    this.inkCircle(ctx, -4, 4, 16, '#5c6bc0'); // quần xanh bên dưới áo khủng long
-    this.inkCircle(ctx, 2, 2, 18, '#e67e22');
-    // Đầu mũ khủng long cam hình hạt đậu
+    this.inkCircle(ctx, 12 + tailWag * 0.3, 14, 14, tailColor);
+    this.inkCircle(ctx, -4, 4, 16, pantsColor);
+    this.inkCircle(ctx, 2, 2, 18, bodyColor);
+
+    // Đầu mũ khủng long hạt đậu
     ctx.save();
     ctx.rotate(0.45);
-    this.inkEllipse(ctx, 2, -4, 19, 15, '#f08a2b');
-    // 2 Mắt cúc áo khâu trên mũ khủng long + Gai lưng nâu
-    this.inkCircle(ctx, -6, -8, 4.2, '#784212');
-    this.inkCircle(ctx, 2, -11, 4.2, '#784212');
-    this.inkCircle(ctx, 8, -1, 3.8, '#873600');
-    this.inkCircle(ctx, 14, 4, 3.8, '#873600');
+    this.inkEllipse(ctx, 2, -4, 19, 15, headColor);
+    // 2 Mắt cúc áo khâu trên mũ khủng long + Gai lưng
+    this.inkCircle(ctx, -6, -8, 4.2, eyeRingColor);
+    this.inkCircle(ctx, 2, -11, 4.2, eyeRingColor);
+    this.inkCircle(ctx, 8, -1, 3.8, spikeColor);
+    this.inkCircle(ctx, 14, 4, 3.8, spikeColor);
     ctx.restore();
 
-    // Nhãn tên YOU (đỏ cam nổi bật viền đen đậm)
+    if (isHuyen) {
+      // Hoa đào hồng 🌸 cài trên đầu Huyền
+      this.inkCircle(ctx, -8, -16, 4, '#ff80ab');
+      this.inkCircle(ctx, -14, -14, 4, '#ff80ab');
+      this.inkCircle(ctx, -6, -10, 4, '#ff80ab');
+      this.inkCircle(ctx, -12, -8, 4, '#ff80ab');
+      this.inkCircle(ctx, -10, -12, 3, '#ffd54f');
+    } else {
+      // Mũ thể thao xanh dương của Hiếu 🧢
+      this.inkRoundRect(ctx, -12, -18, 20, 6, 3, '#1976d2');
+      this.inkRect(ctx, -2, -16, 12, 3, '#0d47a1');
+    }
+
+    // Nhãn tên nổi bật (Hiếu 💙 / Huyền 💖 viền đen đậm)
     ctx.font = '900 18px "Baloo 2", sans-serif';
     ctx.textAlign = 'center';
     ctx.strokeStyle = '#1a110b';
     ctx.lineWidth = 5;
     ctx.strokeText(c.name, 0, -34);
-    ctx.fillStyle = c.tagColor;
+    ctx.fillStyle = c.tagColor || (isHuyen ? '#f472b6' : '#38bdf8');
     ctx.fillText(c.name, 0, -34);
 
     ctx.restore();

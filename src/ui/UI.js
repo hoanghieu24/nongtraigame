@@ -26,6 +26,7 @@ import { Menu } from './Menu.js';
 import { CoupleArcade } from './CoupleArcade.js';
 import { WEATHER } from '../data/weather.js';
 import { VP } from '../core/Viewport.js';
+import { foodValue } from '../player/VitalsSystem.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const btn = (a, label, d = '', cls = '') => `<button class="b ${cls}" data-a="${a}" ${d}>${label}</button>`;
@@ -81,6 +82,7 @@ export class UI {
         <span id="vWx">☀️</span><b id="vTime">07:00</b><small id="vDay"></small><i class="vSep"></i><span class="streakChip">🔥<b id="vStreak">1</b></span>
       </div>
     </div>
+    <div id="vitals" class="pill hudVital" title="Độ no và sức khỏe"><span>🍗</span><i class="bar food"><u id="vFood"></u></i><span>❤️</span><i class="bar hp"><u id="vHp"></u></i></div>
     <div id="hudR">
       <button class="ib giftBtn" data-h="arcade" title="Khu Vui Chơi Đôi Hiếu ❤️ Huyền"><span>🎮</span></button>
       <button class="ib giftBtn" data-h="daily" title="Quà Điểm Danh & Vòng Quay May Mắn"><u id="dDot" class="hidden"></u><span>🎁</span></button>
@@ -183,7 +185,9 @@ export class UI {
   update(dt, ti) {
     const g = this.g, st = g.store.state, me = g.local.me; if (g.mode !== 'play' || !me) return;
     const set = (id, v) => { if (this.cache[id] !== v) { this.cache[id] = v; const el = $('#' + id); if (el) el.textContent = v; } };
+    const setBar = (id, value) => { const pct = Math.round(clamp(value, 0, 100)); if (this.cache[id] !== pct) { this.cache[id] = pct; const el = $('#' + id); if (el) el.style.width = pct + '%'; } };
     set('vMoney', fmt(me.money)); set('vFund', fmt(st.economy.fund)); const lp = levelProgress(st.farm.xp); set('vLvl', 'Cấp ' + st.farm.level); const xp = $('#vXp u'); if (xp) xp.style.width = Math.max(12, lp.pct * 100) + '%';
+    setBar('vFood', me.food ?? 100); setBar('vHp', me.hp ?? 100);
     set('vTime', hhmm(ti.hour)); set('vDay', `N${ti.hour < 6 ? ti.day : ti.day} ${SEASON_ICONS[ti.season]}`); set('vWx', st.world.weather !== 'clear' ? WEATHER[st.world.weather].icon : ti.night ? '🌙' : '☀️'); set('vAv', me.avatar); set('vName', me.name + ((me.sleeping || g.local.inBed) ? ' 💤' : '')); set('vPl', 'Cấp ' + me.level);
     set('vStreak', st.daily?.streak || 1);
     const online = Object.values(st.players).filter((p) => p.connected).length; set('vCoop', online > 1 ? `👥${online}` : '');
@@ -192,8 +196,9 @@ export class UI {
     const isLying = !!(g.local.inBed || me.sleeping);
     const sl = $('#sleep'); sl.classList.toggle('hidden', !isLying);
     if (isLying) {
-      const aw = Object.values(st.players).filter((p) => p.connected && !p.sleeping).length;
-      set('sleepInfo', me.sleeping && aw ? `Đợi ${aw} người nữa cùng ngủ để qua đêm 🌙` : 'Nhân vật đang nằm trên gối, mắt nhắm êm dịu • Bấm nút bên dưới để ngủ qua đêm');
+      const active = Object.values(st.players).filter((p) => p.connected);
+      const aw = active.filter((p) => !p.sleeping).length;
+      set('sleepInfo', aw > 0 ? `Đang ngủ say... Đợi ${aw} người nữa cùng lên giường để qua đêm 🌙` : 'Cả hai đều đang ngủ ngon giấc, trời sắp sáng... ☀️');
     }
     this.guideT -= dt; if (this.guideT <= 0) { this.guideT = 0.35; this.updateGuide(st, me); this.updateAlert(st); this.refreshHotbar(); this.updateContest(st); this.qDot(st); this.updateRscHud(st, me); }
     $('#app').classList.toggle('building', g.build.on); this.marker();
@@ -345,11 +350,13 @@ export class UI {
       case 'slot': this.sel = this.sel === d.key ? '' : d.key; this.render(true); return;
       case 'close': this.close(); break; case 'tab': this.tab = d.v; this.sel = ''; this.render(true); break; case 'filter': this.filter = d.v; this.render(true); break; case 'sel': this.sel = this.sel === d.id ? '' : d.id; this.render(true); break;
       case 'buy': { const r = this.send({ type: 'shop.buy', shop: d.shop, key: d.key, qty: +d.q || 1 }); if (d.key?.startsWith('pen:')) this.tab = 'animals'; break; }
+      case 'sellAnimal': this.send({ type: 'shop.sellAnimal', id: d.id }); break;
       case 'incubate': this.send({ type: 'animal.incubate', pen: d.pen || 'coop', animalId: d.aid || null }); break;
       case 'pengate': this.send({ type: 'animal.gate', pen: d.pen || 'coop' }); break;
       case 'sellall': this.send({ type: 'economy.sell', items: 'all', at: this.params.at }); break; case 'sell': this.send({ type: 'economy.sell', items: { [d.id]: +d.n }, at: this.params.at }); break;
       case 'donate': this.send({ type: 'economy.donate', amount: +d.n }); break;
       case 'dep': this.send({ type: 'items.deposit', item: d.id, qty: d.q === 'all' ? 'all' : +d.q || 1 }); this.sel = ''; break; case 'wd': this.send({ type: 'items.withdraw', item: d.id, qty: +d.q || 1 }); this.sel = ''; break; case 'depall': this.send({ type: 'items.deposit', item: 'all' }); break;
+      case 'eat': this.send({ type: 'vitals.eat', item: d.id }); this.sel = ''; break;
       case 'seedpick': this.send({ type: 'items.seed', crop: d.id }); this.sel = ''; this.close(); setTimeout(() => this.refreshHotbar(), 120); break;
       case 'weapon': this.send({ type: 'items.weapon', id: d.id }); break; case 'hat': this.send({ type: 'items.hat', id: d.id }); break;
       case 'cook': this.send({ type: 'rest.cook', recipe: d.r, station: d.st }); break; case 'collect': this.send({ type: 'rest.collect', station: d.st }); break;
@@ -469,7 +476,7 @@ export class UI {
     const it = ITEMS[s.id], hot = st.economy.hot === s.id, info = it.cat === 'seed' && CROPS[it.crop] ? `⏱️ Chín: ${fmtGrow(CROPS[it.crop].grow)} • Bán ${CROPS[it.crop].sell}🪙` : isSellable(s.id) ? `Bán ~${Math.round(it.sell * (hot ? 1.5 : 1))}🪙${hot ? ' 🔥' : ''}` : it.desc || '';
     let b;
     if (this.panel === 'chest') b = src === 'bag' ? ['1', '10', 'all'].map((q) => `<button class="b sm" data-a="dep" data-id="${s.id}" data-q="${q}">→ Rương ${q === 'all' ? 'hết' : '×' + q}</button>`).join('') : ['1', '10', String(s.total)].map((q, i) => `<button class="b sm" data-a="wd" data-id="${s.id}" data-q="${q}">← Lấy ${i === 2 ? 'hết' : '×' + q}</button>`).join('');
-    else b = `${it.cat === 'seed' ? `<button class="b sm" data-a="seedpick" data-id="${it.crop}">🌱 Chọn để gieo</button>` : ''}<button class="b sm ghost" data-a="dep" data-id="${s.id}" data-q="all">📦 Gửi vào rương</button>`;
+    else b = `${it.cat === 'seed' ? `<button class="b sm" data-a="seedpick" data-id="${it.crop}">🌱 Chọn để gieo</button>` : ''}${src === 'bag' && foodValue(s.id) ? `<button class="b sm go" data-a="eat" data-id="${s.id}">🍴 Ăn ×1</button>` : ''}<button class="b sm ghost" data-a="dep" data-id="${s.id}" data-q="all">📦 Gửi vào rương</button>`;
     return `<div class="pop"><b>${it.icon} ${it.name}</b><small>×${s.total} ${info}</small>${b}</div>`;
   }
   p_seeds(st, me) {
@@ -483,7 +490,7 @@ export class UI {
   p_shop(st, me) {
     const shop = this.params.shop, def = SHOPS[shop], rows = shopCatalog(shop, st), tab = this.tab || def.tabs[0][0];
     let h = `<div class="tabs">${def.tabs.map(([k, n]) => btn('tab', n, `data-v="${k}"`, tab === k ? 'on' : '')).join('')}</div>${shop === 'seed' ? '<div class="note">' + SEASONS[st.world.season] + ' ' + SEASON_ICONS[st.world.season] + ' — cây đúng mùa lớn nhanh hơn</div>' : ''}`;
-    if (shop === 'animal') {
+    if (shop === 'animal' && tab !== 'sell') {
       const focusPen = this.params.pen || 'coop';
       const P = PENS[focusPen] || PENS.coop, b = st.buildings[focusPen] || {};
       const allAn = Object.values(st.animals), inPen = allAn.filter((a) => a.pen === focusPen);
@@ -506,13 +513,17 @@ export class UI {
         h += `<div class="note">📍 Bạn đang đứng cạnh <b>${P.name}</b>: ${b.owned ? `Đã mở (${inPen.length}/${P.cap} con) • Cửa ${b.open ? 'Đang mở 🔓' : 'Đang đóng 🔒'} ${btn('pengate', b.open ? '🔒 Đóng cửa' : '🔓 Mở cửa', `data-pen="${focusPen}"`, 'sm ghost')}` : 'Chưa mở khóa — bấm mua ở tab 🏠 Xây Chuồng bên dưới để sử dụng ngay!'}</div>`;
       }
     }
+    if (shop === 'animal' && tab === 'sell') h += '<div class="note">🐾 Bán vật nuôi tại Cửa Hàng Thú Cưng trong Làng. Thú con giá thấp hơn; thú Vàng và thú được chăm tốt có giá cao hơn.</div>';
     h += '<div class="cards">';
-    for (const r of rows.filter((x) => x.tab === tab)) {
-      const can = !r.locked && !r.owned && (r.pay === 'fund' ? st.economy.fund + me.money >= r.price : me.money >= r.price), multi = r.kind === 'seed' || r.kind === 'goods';
+    const visibleRows = rows.filter((x) => x.tab === tab);
+    if (shop === 'animal' && tab === 'sell' && !visibleRows.length) h += '<p class="empty">Chưa có vật nuôi để bán. Mua thú hoặc ấp trứng để nuôi thêm nhé!</p>';
+    for (const r of visibleRows) {
+      const animalSell = r.kind === 'animalSell', itemName = animalSell ? esc(r.name) : r.name;
+      const can = animalSell || (!r.locked && !r.owned && (r.pay === 'fund' ? st.economy.fund + me.money >= r.price : me.money >= r.price)), multi = r.kind === 'seed' || r.kind === 'goods';
       const isFocus = this.params.pen && (r.key === 'pen:' + this.params.pen || r.pen === this.params.pen);
-      h += `<div class="card shopc ${r.locked ? 'dim' : ''} ${isFocus ? 'on' : ''}"><span class="ti big">${r.icon}</span><b>${r.name}</b><small>${r.desc || ''}</small>${r.note ? `<small class="warnt">${r.note}</small>` : ''}<div class="price">${r.owned ? '✔ Đã mở' : `${fmt(r.price)} 🪙${r.pay === 'fund' ? ' (Quỹ+Ví) 🏦' : ''}`}</div>${r.locked ? `<small class="lock">🔒 ${r.reason}</small>` : r.owned ? '' : `<div class="row">${btn('buy', 'Mua ngay', `data-shop="${shop}" data-key="${r.key}" data-q="1"`, can ? 'go' : 'off')}${multi && can ? btn('buy', '×5', `data-shop="${shop}" data-key="${r.key}" data-q="5"`, 'ghost') : ''}</div>`}</div>`;
+      h += `<div class="card shopc ${r.locked ? 'dim' : ''} ${isFocus ? 'on' : ''}"><span class="ti big">${r.icon}</span><b>${itemName}</b><small>${r.desc || ''}</small>${r.note ? `<small class="warnt">${r.note}</small>` : ''}<div class="price">${animalSell ? `Nhận ${fmt(r.price)} 🪙` : r.owned ? '✔ Đã mở' : `${fmt(r.price)} 🪙${r.pay === 'fund' ? ' (Quỹ+Ví) 🏦' : ''}`}</div>${r.locked ? `<small class="lock">🔒 ${r.reason}</small>` : r.owned ? '' : animalSell ? `<div class="row">${btn('sellAnimal', 'Đem bán', `data-id="${esc(r.ref)}"`, 'go')}</div>` : `<div class="row">${btn('buy', 'Mua ngay', `data-shop="${shop}" data-key="${r.key}" data-q="1"`, can ? 'go' : 'off')}${multi && can ? btn('buy', '×5', `data-shop="${shop}" data-key="${r.key}" data-q="5"`, 'ghost') : ''}</div>`}</div>`;
     }
-    h += '</div>'; if (shop === 'animal' && tab === 'animals') h += '<small class="hint">💡 Mẹo: Khi đóng cửa chuồng (🔒), gà và thú sẽ ở yên trong chuồng không chạy ra ngoài. Cho gà ăn no để đẻ trứng và ấp nở Gà Con!</small>'; return h;
+    h += '</div>'; if (shop === 'animal' && tab === 'animals') h += '<small class="hint">💡 Mẹo: Khi đóng cửa chuồng (🔒), gà và thú sẽ ở yên trong chuồng không chạy ra ngoài. Cho gà ăn no để đẻ trứng và ấp nở Gà Con!</small>'; if (shop === 'animal' && tab === 'sell') h += '<small class="hint">Cần đứng gần Cửa Hàng Thú Cưng ở Làng để hoàn tất giao dịch. Cún đồng hành không bán được.</small>'; return h;
   }
   p_sell(st, me) {
     const at = this.params.at, bag = st.inventory.players[me.id] || {}, mult = at === 'market' ? 1.1 : 1, ids = Object.keys(bag).filter((id) => isSellable(id)), hot = st.economy.hot;
@@ -528,7 +539,7 @@ export class UI {
       <div class="fundbox"><b>🏦 Quỹ chung: ${fmt(st.economy.fund)} 🪙</b><small>Xây chuồng, nâng nhà, mở rộng ruộng, mở nhà hàng</small><div class="row">${[50, 200, 1000].map((n) => btn('donate', `+${n}`, `data-n="${n}"`, me.money >= n ? 'sm' : 'sm off')).join('')}</div></div>`;
   }
   p_emote() {
-    const E = [['😘', 'wave', 'Hôn gió'], ['💋', 'wave', 'Hôn'], ['❤️', 'wave', 'Yêu'], ['🥰', 'celebrate', 'Mê quá'], ['😍', 'surprised', 'Wow'], ['💕', 'wave', 'Tim tim'], ['🤗', 'celebrate', 'Ôm'], ['😂', 'celebrate', 'Haha'], ['😭', 'sad', 'Hu hu'], ['😮', 'surprised', 'Ồ'], ['👍', 'celebrate', 'Tuyệt'], ['🎉', 'celebrate', 'Ăn mừng']];
+    const E = [['😘', 'kiss', 'Hôn gió'], ['💋', 'kiss', 'Hôn'], ['❤️', 'wave', 'Yêu'], ['🥰', 'celebrate', 'Mê quá'], ['😍', 'surprised', 'Wow'], ['💕', 'wave', 'Tim tim'], ['🤗', 'hug', 'Ôm'], ['🫂', 'hug', 'Ôm nhau'], ['😂', 'celebrate', 'Haha'], ['😭', 'sad', 'Hu hu'], ['😮', 'surprised', 'Ồ'], ['👍', 'celebrate', 'Tuyệt'], ['🎉', 'celebrate', 'Ăn mừng']];
     return `<div class="emotes">${E.map(([e, a, n]) => `<button class="emo" data-a="emote" data-e="${e}" data-anim="${a}"><span>${e}</span><small>${n}</small></button>`).join('')}</div><small class="hint">Gửi cho người chơi cùng — hiện trên đầu nhân vật.</small>`;
   }
 
@@ -770,7 +781,7 @@ export class UI {
   }
   p_room(st) { const ses = this.g.session; return `<div class="card big1"><span class="ti big">👫</span><b>Mời người yêu / bạn bè vào farm (Khác mạng / Khác nơi)</b><div class="room"><b class="code">${ses.code}</b>${btn('copy', '📋 Chép mã', '', 'sm')}${btn('copylink', '🔗 Chép Link Mời', '', 'sm go')}</div><small>Gửi <b>Link Mời</b> qua Zalo/Messenger hoặc nhập mã này ở mục <b>Vào Bạn Bè</b>. Tối đa ${CFG.MAX_PLAYERS} người • Tiến độ tự động lưu Cloud ☁️ trên cả 2 máy! ${ses.status.peer === 'open' ? '✔ Online sẵn sàng' : ses.status.peer === 'connecting' ? '⏳ Đang mở phòng online...' : ''}</small>${btn('close', 'Vào chơi thôi!', '', '')}</div>`; }
   p_chat(st, me) {
-    return `<div class="chatlog">${this.chatLog.map((m) => `<div><b>${esc(m.name)}</b> ${esc(m.text)}</div>`).join('') || '<small class="empty">Chưa có tin nhắn</small>'}</div><div class="row"><input id="chatIn" maxlength="100" placeholder="Nhắn gì đó..." autocomplete="off">${btn('send', 'Gửi', '', 'sm')}</div><div class="chips">${[['😀', 'celebrate'], ['❤️', 'wave'], ['👍', 'wave'], ['😭', 'sad'], ['😮', 'surprised'], ['🎉', 'celebrate']].map(([e, a]) => `<button class="b sm ghost" data-a="emote" data-e="${e}" data-anim="${a}">${e}</button>`).join('')}</div>`;
+    return `<div class="chatlog">${this.chatLog.map((m) => `<div><b>${esc(m.name)}</b> ${esc(m.text)}</div>`).join('') || '<small class="empty">Chưa có tin nhắn</small>'}</div><div class="row"><input id="chatIn" maxlength="100" placeholder="Nhắn gì đó..." autocomplete="off">${btn('send', 'Gửi', '', 'sm')}</div><div class="chips">${[['😘', 'kiss'], ['🤗', 'hug'], ['😀', 'celebrate'], ['❤️', 'wave'], ['👍', 'wave'], ['😭', 'sad'], ['😮', 'surprised'], ['🎉', 'celebrate']].map(([e, a]) => `<button class="b sm ghost" data-a="emote" data-e="${e}" data-anim="${a}">${e}</button>`).join('')}</div>`;
   }
   openDialog(npcId) {
     const g = this.g, def = NPCS[npcId], st = g.store.state; this.dialogNpc = npcId; const l = [...def.lines]; if (st.world.weather === 'rain') l.push(def.rain); if (Object.keys(st.thieves).length) l.push(def.thief);

@@ -53,18 +53,30 @@ export class FX {
     this.points = new THREE.Points(geo, this.mat); this.points.frustumCulled = false; this.points.renderOrder = 10; scene.add(this.points);
     this.shake = 0; this.floats = []; this._tmp = new THREE.Vector3();
   }
-  setCap(n) { this.cap = Math.min(this.max, n); }
+  setCap(n) {
+    const cap = Math.max(1, Math.min(this.max, Math.floor(n) || 1));
+    if (cap === this.cap) return;
+    const oldCap = this.cap;
+    this.cap = cap; this.head %= cap;
+    if (cap < oldCap) for (let i = cap; i < oldCap; i++) { this.life[i] = 0; this.aSize.array[i] = 0; }
+    this.n = 0;
+    for (let i = 0; i < cap; i++) if (this.life[i] > 0) this.n++;
+    if (cap < oldCap) this.aSize.needsUpdate = true;
+  }
   burst(kind, x, y, z, n = 8) {
     const k = KINDS[kind] || KINDS.sparkle, r = (a, b) => a + Math.random() * (b - a), c = new THREE.Color();
     n = Math.max(1, Math.round(n * (this.cap / this.max > 0.5 ? 1 : 0.5)));
+    let changedType = false;
     for (let j = 0; j < n; j++) {
       const i = this.head; this.head = (this.head + 1) % this.cap; if (i >= this.cap) continue;
+      if (this.life[i] <= 0 && this.aSize.array[i] === 0) this.n++;
       const a = Math.random() * 6.283, sp = r(0, k.spread);
       this.pos.set([x + r(-0.15, 0.15), y, z + r(-0.15, 0.15)], i * 3);
       this.vel.set([Math.cos(a) * sp, r(k.vy[0], k.vy[1]), Math.sin(a) * sp], i * 3);
       this.maxLife[i] = this.life[i] = r(k.life[0], k.life[1]); this.size0[i] = r(k.size[0], k.size[1]); this.grow[i] = k.grow || 0; this.g[i] = k.g; this.alpha[i] = k.alpha || 1;
-      c.setHex(Math.random() < 0.5 ? k.col[0] : k.col[1]); this.c0.set([c.r, c.g, c.b], i * 3); this.aType.array[i] = k.t; this.aType.needsUpdate = true;
+      c.setHex(Math.random() < 0.5 ? k.col[0] : k.col[1]); this.c0.set([c.r, c.g, c.b], i * 3); this.aType.array[i] = k.t; changedType = true;
     }
+    if (changedType) this.aType.needsUpdate = true;
   }
   // chữ nổi (DOM) bay lên rồi mờ dần
   float(x, y, z, text, color = '#fff') {
@@ -75,19 +87,24 @@ export class FX {
   addShake(a) { this.shake = Math.min(1, this.shake + a); }
   update(dt, camera) {
     const { pos, vel, life, maxLife, aPos, aSize, aCol } = this;
-    for (let i = 0; i < this.cap; i++) {
-      if (life[i] <= 0) { if (aSize.array[i] !== 0) aSize.array[i] = 0; continue; }
-      life[i] -= dt; const f = Math.max(0, life[i] / maxLife[i]);
-      vel[i * 3 + 1] -= this.g[i] * dt; vel[i * 3] *= 1 - 1.2 * dt; vel[i * 3 + 2] *= 1 - 1.2 * dt;
-      pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] = Math.max(0.05, pos[i * 3 + 1] + vel[i * 3 + 1] * dt); pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
-      aPos.array[i * 3] = pos[i * 3]; aPos.array[i * 3 + 1] = pos[i * 3 + 1]; aPos.array[i * 3 + 2] = pos[i * 3 + 2];
-      aSize.array[i] = this.size0[i] * (this.grow[i] ? 1 + (1 - f) * this.grow[i] : 0.5 + f * 0.5);
-      aCol.array[i * 4] = this.c0[i * 3]; aCol.array[i * 4 + 1] = this.c0[i * 3 + 1]; aCol.array[i * 4 + 2] = this.c0[i * 3 + 2]; aCol.array[i * 4 + 3] = Math.min(1, f * 2.2) * this.alpha[i];
+    if (this.n > 0) {
+      for (let i = 0; i < this.cap; i++) {
+        if (life[i] <= 0) {
+          if (aSize.array[i] !== 0) { aSize.array[i] = 0; this.n--; }
+          continue;
+        }
+        life[i] -= dt; const f = Math.max(0, life[i] / maxLife[i]);
+        vel[i * 3 + 1] -= this.g[i] * dt; vel[i * 3] *= 1 - 1.2 * dt; vel[i * 3 + 2] *= 1 - 1.2 * dt;
+        pos[i * 3] += vel[i * 3] * dt; pos[i * 3 + 1] = Math.max(0.05, pos[i * 3 + 1] + vel[i * 3 + 1] * dt); pos[i * 3 + 2] += vel[i * 3 + 2] * dt;
+        aPos.array[i * 3] = pos[i * 3]; aPos.array[i * 3 + 1] = pos[i * 3 + 1]; aPos.array[i * 3 + 2] = pos[i * 3 + 2];
+        aSize.array[i] = this.size0[i] * (this.grow[i] ? 1 + (1 - f) * this.grow[i] : 0.5 + f * 0.5);
+        aCol.array[i * 4] = this.c0[i * 3]; aCol.array[i * 4 + 1] = this.c0[i * 3 + 1]; aCol.array[i * 4 + 2] = this.c0[i * 3 + 2]; aCol.array[i * 4 + 3] = Math.min(1, f * 2.2) * this.alpha[i];
+      }
+      aPos.needsUpdate = aSize.needsUpdate = aCol.needsUpdate = true;
+      const h = this.ui.canvasHeight();
+      if (camera.isOrthographicCamera) { this.mat.uniforms.uOrtho.value = 1; this.mat.uniforms.uScale.value = h / (camera.top - camera.bottom); }
+      else { this.mat.uniforms.uOrtho.value = 0; this.mat.uniforms.uScale.value = h / (2 * Math.tan((camera.fov * Math.PI) / 360)); }
     }
-    aPos.needsUpdate = aSize.needsUpdate = aCol.needsUpdate = true;
-    const h = this.ui.canvasHeight();
-    if (camera.isOrthographicCamera) { this.mat.uniforms.uOrtho.value = 1; this.mat.uniforms.uScale.value = h / (camera.top - camera.bottom); }
-    else { this.mat.uniforms.uOrtho.value = 0; this.mat.uniforms.uScale.value = h / (2 * Math.tan((camera.fov * Math.PI) / 360)); }
     // chữ nổi
     for (let i = this.floats.length - 1; i >= 0; i--) {
       const f = this.floats[i]; f.t += dt; const k = f.t / f.life;
