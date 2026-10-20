@@ -64,7 +64,7 @@ export class AnimalView {
         if (rig.icon) rig.root.add(rig.icon);
       }
       if (rig.icon) rig.icon.position.y = rig.r * 2.3 + 0.9 + Math.sin(t * 3 + a.x) * 0.1;
-      if (a.st === 'sleep' && (this.zT -= dt * 0.06) < 0 && Math.random() < dt * 0.9) thing.fx.burst('zzz', rig.vx, rig.r * 1.6 + 0.4, rig.vz, 1);
+     
     }
     for (const [id, rig] of this.rigs) if (!seen.has(id)) { this.group.remove(rig.root); this.rigs.delete(id); }
 

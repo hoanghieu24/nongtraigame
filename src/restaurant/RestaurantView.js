@@ -90,7 +90,6 @@ export class RestaurantView {
       } else if (s.state === 'cooking') {
         const left = Math.max(1, Math.ceil(s.t0 + s.dur - st.world.t));
         label = `${RECIPES[s.recipe]?.icon || '🍳'} ${left}s`;
-        if (this.steam <= 0 && vis) this.ctx.fx.burst('smoke', stPos.x, stPos.y - 0.65, stPos.z, 1);
       } else if (s.state === 'ready') {
         label = s.warned ? `⚠️ ${RECIPES[s.recipe]?.icon || '🍽️'}` : `${RECIPES[s.recipe]?.icon || '🍽️'}`;
       } else if (s.state === 'burning' || s.state === 'burnt') {

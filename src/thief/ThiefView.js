@@ -22,7 +22,7 @@ export class ThiefView {
       let anim = th.st === 'sneak' ? 'walk' : th.st === 'steal' ? 'plant' : th.st === 'flee' ? 'run' : th.st === 'stun' ? 'stumble' : 'surprised';
       if (th.st === 'caught') { r.fly += dt; r.root.position.y += r.fly * r.fly * 14; r.root.rotation.y += r.fly * 18; r.root.scale.setScalar(Math.max(0.1, 1 - r.fly * 0.4)); anim = 'surprised'; }
       if (th.st === 'stun' && (this.starT -= dt) < 0) { this.starT = 0.25; this.ctx.fx.burst('stars', r.vx, 3, r.vz, 2); }
-      if (th.st === 'steal' && Math.random() < dt * 4) this.ctx.fx.burst('sparkle', r.vx, 1.2, r.vz, 1);
+      
       poseCharacter(r, anim, dt, th.st === 'flee' ? 0.9 : 0.4); r.hpBar.visible = th.st !== 'caught';
       if (th.st === 'sneak') r.torso.rotation.x = 0.45;
     }

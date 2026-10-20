@@ -45,7 +45,7 @@ export class PlayerView {
       const tool = TOOLS[pose.tool ?? 0]; setTool(rig, p.carry ? 'none' : p.fishing ? 'rod' : tool, p.weapon);
       let anim = pose.anim || 'idle'; if (p.carry && (anim === 'idle' || anim === 'walk' || anim === 'run')) anim = 'carry';
       if (p.fishing && (anim === 'idle' || anim === 'walk')) anim = p.fishing.phase === 'reel' ? 'reel' : 'fish';
-      poseCharacter(rig, anim, dt, pose.spd || 0, airY); if (anim === 'sleep' && Math.random() < dt * 0.7) this.ctx.fx.burst('zzz', rig.vx, (pose.y ?? 0) + 1.6, rig.vz - 0.6, 1);
+      poseCharacter(rig, anim, dt, pose.spd || 0, airY);
       // Hiển thị icon nguyên liệu / món ăn người chơi đang bưng trên tay
       const cIc = carryIconOf(p.carry);
       if (rig.carryIconKey !== cIc) {

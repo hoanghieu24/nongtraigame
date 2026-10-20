@@ -174,7 +174,7 @@ export class Game {
   persist(sync) { if (this.mode !== 'play' || this.session.role === 'none') return; const role = this.session.role === 'host' ? 'host' : 'guest'; if (sync) this.save.saveSync(this.store.state, role); else this.save.save(this.store.state, role); }
   onChat(m) { this.ui.chatAdd(m); this.views.player.say(m.from, m.text); if (/^(😘|💋|❤️|🥰|😍|💕)$/.test(m.text)) { const ps = this.poses()[m.from]; if (ps) { this.fx.burst('hearts', ps.x, 2.8, ps.z, 9); this.audio.sfx('pop', ps.x, ps.z); } } }
   startFishGame(f) { if (this.fishGameOn) return; this.fishGameOn = true; this.ui.fish.start(f.diff ?? 0.3, (win) => { this.fishGameOn = false; this.session.send({ type: 'fish.finish', win }); }); }
-  async confetti() { try { const { default: c } = await import('canvas-confetti'); c({ particleCount: 90, spread: 80, origin: { y: 0.55 }, disableForReducedMotion: true, ticks: 120 }); } catch { /* ignore */ } }
+  async confetti() { try { const { default: c } = await import('canvas-confetti'); c({ particleCount: 40, spread: 70, origin: { y: 0.55 }, disableForReducedMotion: true, ticks: 120 }); } catch { /* ignore */ } }
   handleFx(f) {
     const a = this.audio, fx = this.fx;
     switch (f.k) {

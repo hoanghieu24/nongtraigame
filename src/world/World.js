@@ -51,11 +51,9 @@ export class World {
       const f = Bld.penFence(p, k === 'hutch' ? 0xe8d8b8 : 0xc8955f);
       this.group.add(f);
       this.rects.push(...f.userData.rects);
-      const hutG = Bld.hut(k);
-      this.place(hutG, p.hut.x, p.hut.z, k === 'duck' ? Math.PI / 2 : 0);
-      this.addRects(hutG, p.hut.x, p.hut.z, k === 'duck' ? Math.PI / 2 : 0);
+      // Đã xoá nhà chuồng 3D bên trong chuồng (giảm tải đồ hoạ, chuồng thoáng & dễ nhìn thú hơn)
       this.penGroups ||= {};
-      this.penGroups[k] = { hutG, fenceG: f, signG: null, cx: (p.x0 + p.x1) * 0.5, cz: (p.z0 + p.z1) * 0.5 };
+      this.penGroups[k] = { hutG: null, fenceG: f, signG: null, cx: (p.x0 + p.x1) * 0.5, cz: (p.z0 + p.z1) * 0.5 };
       this.addInteract({ id: 'gate:' + k, kind: 'gate', pen: k, x: p.gate.x, z: p.gate.z, r: 3.8, icon: p.icon, label: p.name });
       this.addInteract({ id: 'penManage:' + k, kind: 'penManage', pen: k, x: p.hut.x, z: p.hut.z + 2.2, r: 3.8, icon: p.icon, label: `Quản lý ${p.name}` });
       if (p.inc) {
@@ -78,18 +76,13 @@ export class World {
     }
     const pz = Bld.plaza(); this.addStatic(pz, VILLAGE.plaza.x, VILLAGE.plaza.z, 0, vg); this.fountain = pz.userData.fountain;
     this.addStatic(Bld.marketStall(), SPOTS.market.x, SPOTS.market.z, Math.PI / 2, vg); this.addInteract({ id: 'market', kind: 'sell', at: 'market', x: SPOTS.market.x + 1.9, z: SPOTS.market.z, icon: '🛒', label: 'Bán ở chợ (+10%)' });
-    this.addStatic(Bld.cafeCart(), VILLAGE.cafeCart.x, VILLAGE.cafeCart.z, -Math.PI / 2, vg);
-    this.addStatic(Bld.flowerPergola(), VILLAGE.flowerPergola.x, VILLAGE.flowerPergola.z, 0, vg);
+    // Làng tối giản: bỏ xe kem, giàn hoa, ghế đá, chậu hoa, cột đèn trang trí để chạy mượt
     this.addStatic(Bld.noticeBoard('Bảng nhiệm vụ'), SPOTS.notice.x, SPOTS.notice.z, 0, vg); this.addInteract({ id: 'notice', kind: 'quests', x: SPOTS.notice.x, z: SPOTS.notice.z + 1.4, icon: '📜', label: 'Bảng nhiệm vụ' });
     this.addStatic(Bld.noticeBoard('Làm thêm: Ready, Set, Cook!', '👨‍🍳', '#ffe9a8', '#8f2d1e'), REST.jobBoard.x, REST.jobBoard.z, 0, vg);
     this.addInteract({ id: 'jobBoard', kind: 'restShift', x: REST.jobBoard.x, z: REST.jobBoard.z + 1.5, r: 3.5, icon: '👨‍🍳', label: 'Làm thêm tại Quán Ăn (Ready, Set, Cook!)' });
 
-    // Đèn đường & ghế đá tinh gọn (loại bỏ các cột đèn/chậu hoa trùng lặp gây tốn draw call)
     const lamp = (x, z, ry = 0, grp = this.group) => { const l = buildFurniture('streetlamp'); this.place(l, x, z, ry, undefined, grp); if (l.userData.glow) this.sky.registerGlow(l.userData.glow); this.circles.push({ x, z, r: 0.35 }); };
-    lamp(-2.1, -6.2, 0.2); lamp(2.3, -2.5, Math.PI - 0.2);
-    for (const [x, z] of [[44, 2], [60, 2], [52, -9], [52, 13], [36, 6]]) lamp(x, z, 0, vg);
-    for (const [x, z, ry] of [[48, 7.5, Math.PI], [56, 7.5, Math.PI], [52, -4.5, 0]]) { const b = buildFurniture('bench'); this.place(b, x, z, ry, undefined, vg); this.circles.push({ x, z, r: 0.9 }); }
-    for (const [x, z] of [[47.5, 11], [57, 11], [-2.2, -11.8], [2.2, -11.8]]) { const f = buildFurniture('flowerpot'); this.place(f, x, z, 0, undefined, x > 25 ? vg : this.group); }
+    lamp(-2.1, -6.2, 0.2);
     // Bãi biển -> gom vào beachGroup để chỉ render khi người chơi tiến về phía nam (z > 14)
     const bg = this.beachGroup;
     const para = (x, z, c) => { const g = new THREE.Group(); g.add(M(merge([bake(Cy(0.05, 0.05, 2.4, 5), 0xf0e6d0, [0, 1.2, 0]), bake(Co(1.5, 0.6, 8), c, [0, 2.5, 0]), bake(B(1.6, 0.04, 0.8, 0.02), 0xffffff, [1.8, 0.03, 0.3]), bake(S(0.2, 6, 5), 0xffd23f, [0, 2.85, 0])]), MAT.lit)); this.place(g, x, z, 0.4, undefined, bg); };
@@ -198,7 +191,6 @@ export class World {
       for (const k in this.penGroups) {
         const pg = this.penGroups[k], d2 = (focus.x - pg.cx) ** 2 + (focus.z - pg.cz) ** 2;
         const vis = mode2D || d2 < 38 * 38;
-        pg.hutG.visible = vis;
         pg.fenceG.visible = vis;
         if (pg.signG) pg.signG.visible = vis && d2 < 28 * 28;
         if (this.gateG[k]) this.gateG[k].g.visible = vis;
@@ -210,7 +202,6 @@ export class World {
     this.sky.update(dt, hour, weather, focus, camera.position, mode2D, indoor);
     u.uFogC.value.copy(this.scene.fog.color); u.uSky.value.copy(this.sky.domeMat.uniforms.uHor.value); u.uSun.value.copy(this.sky.sun.color); u.uFogN.value = this.scene.fog.near; u.uFogF.value = this.scene.fog.far;
     if (!this.gfx.mobile) this.gfx.renderer.toneMappingExposure = this.sky.exposure;
-    this.smokeT -= dt; if (this.smokeT <= 0 && this.chimney && !mode2D && !indoor && Math.hypot(focus.x - HOUSE.x, focus.z - HOUSE.z) < 28) { this.smokeT = 0.65; this.fx.burst('smoke', this.chimney.x, this.chimney.y, this.chimney.z, 1); }
-    if (this.fountain && this.fountain.userData.spray && !indoor && this.villageGroup.visible && Math.hypot(focus.x - VILLAGE.plaza.x, focus.z - VILLAGE.plaza.z) < 24 && Math.random() < dt * 8) this.fx.burst('splash', VILLAGE.plaza.x, 2.9, VILLAGE.plaza.z, 1);
+    // Đã bỏ khói ống khói & tia nước đài phun (hiệu ứng thừa gây giật)
   }
 }

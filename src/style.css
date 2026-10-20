@@ -330,3 +330,11 @@ input[type=text],input:not([type]),#chatIn{flex:1;min-width:0;border:2px solid #
 .arcLaneRunner{position:absolute;top:2px;font-size:18px;transition:left .12s linear}
 .arcLaneFlag{font-size:14px;width:55px;text-align:right}
 
+
+/* Nút Quán Ăn nhỏ gọn ở góc (thay cho thanh đơn hàng to) */
+.rscBar,.phone .rscBar{left:auto;right:calc(var(--sar) + 14px);bottom:calc(var(--sab) + 156px);transform:none;background:none;border:0;box-shadow:none;padding:0;max-width:none;gap:0}
+.phone .rscBar{right:calc(var(--sar) + 10px);bottom:calc(var(--sab) + 128px)}
+.rscMini{background:linear-gradient(180deg,#ffb463,#e87d2a);color:#fff;border:2px solid #fff;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:800;box-shadow:0 2px 0 #bd5c14,0 3px 8px rgba(0,0,0,.22);white-space:nowrap}
+.rscMini.on{background:linear-gradient(180deg,#5ad37e,#2ea65a);box-shadow:0 2px 0 #1e7a40}
+.rscMini:active{transform:scale(.94)}
+.phone .rscMini{font-size:10.5px;padding:2px 8px}

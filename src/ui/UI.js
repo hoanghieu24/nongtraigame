@@ -217,39 +217,9 @@ export class UI {
     el.classList.toggle('hidden', !show);
     if (!show) return;
 
-    const guests = Object.values(r.guests || {}).filter((g) => g.state === 'seated' && g.dish);
     const shiftOn = !!r.shift?.active;
-    const carryTxt = fmtCarry(me.carry);
-    const combo = r.shift?.combo || 0;
-
-    let cardsHtml = '';
-    if (guests.length) {
-      cardsHtml = guests.map((g) => {
-        const c = CUSTOMERS[g.kind], rec = RECIPES[g.dish];
-        const req = rec?.rsc || ['veg', 'veg'];
-        const prepSt = Object.values(r.stations || {}).find((s) => s.recipe === g.dish);
-        const prog = rscProgress(prepSt || { recipe: g.dish, req, added: [] });
-        const stepIcons = prog.map((p) => `<span class="rscIng ${p.have >= p.need ? 'ok' : ''}">${p.icon}${p.have}/${p.need}</span>`).join('+');
-        const patPct = clamp(g.patience / c.patience, 0, 1);
-        return `<button class="rscOrder" data-rsc="quick" data-gid="${g.id}" title="Chạm để tự động làm bước tiếp theo cho món này">
-          <div class="rscTop"><span class="rscDish">${rec?.icon || '🍽️'}</span><b>${rec?.name || ''}</b><small>${c.icon}</small></div>
-          <div class="rscSteps">${stepIcons} ➔ 🔪 ➔ ${rec?.pot === 'pot' ? '🍲' : '🍳'}</div>
-          <i class="rscPat"><u style="width:${patPct * 100}%"></u></i>
-        </button>`;
-      }).join('');
-    } else {
-      cardsHtml = `<div class="rscWait">${shiftOn ? '🛎️ Khách đang bước vào Bàn Tiệc Oval...' : '👨‍🍳 Chạm "Vào Ca Làm Thêm" hoặc lấy nguyên liệu trong Bếp để đón khách!'}</div>`;
-    }
-
-    const html = `
-      <div class="rscLeft">
-        <button class="rscBtn ${shiftOn ? 'on' : ''}" data-rsc="shift">${shiftOn ? '👨‍🍳 Đang làm thêm' : '▶️ Vào Ca Làm Thêm'}</button>
-        <button class="rscBtn quick" data-rsc="quick">⚡ Làm nhanh</button>
-        <button class="rscBtn ghost" data-rsc="panel">📋 Bếp (${r.cleanPlates ?? 6}🍽️)</button>
-        <span class="rscMeta">✋ <b>${esc(carryTxt)}</b> • 🪙+${fmt(r.shift?.earned || 0)}${combo >= 2 ? ` • 🔥Combo ×${combo}` : ''}</span>
-      </div>
-      <div class="rscStrip">${cardsHtml}</div>
-    `;
+    // Chỉ 1 nút nhỏ gọn ở góc màn hình: chạm để vào quán chơi
+    const html = `<button class="rscMini ${shiftOn ? 'on' : ''}" data-rsc="shift">👨‍🍳 ${shiftOn ? `+${fmt(r.shift?.earned || 0)}🪙` : 'Vào Quán'}</button>`;
     if (el._last !== html) { el._last = html; el.innerHTML = html; }
   }
 

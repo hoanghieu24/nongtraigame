@@ -8,28 +8,15 @@ import { buildFurniture } from './FurnitureModels.js';
 const W = 0xc8955f, W2 = 0x8f5e38, CREAM = 0xfef0d4, SQ = Math.SQRT2;
 const dk = (h, f = 0.78) => new THREE.Color(h).multiplyScalar(f).getHex();
 
-// Mái ngói xếp tầng chân thực
-const roof = (w, d, h, c, ov = 0.62, y = 0) => {
-  const parts = [
-    bake(B(w + ov * 2 + 0.16, 0.22, d + ov * 2 + 0.16, 0.08), dk(c, 0.76), [0, y + 0.1, 0]),
-    bake(Co(1, 1, 4), c, [0, y + 0.18 + h / 2, 0], [0, Math.PI / 4, 0], [(w + ov * 2) / SQ, h, (d + ov * 2) / SQ]),
-  ];
-  const tiers = 5;
-  for (let i = 0; i < tiers; i++) {
-    const t = i / tiers, ty = y + 0.26 + t * (h * 0.82), s = 1 - t * 0.78;
-    const tw = (w + ov * 2) * s + 0.08, td = (d + ov * 2) * s + 0.08;
-    parts.push(bake(B(tw, 0.11, td, 0.04), i % 2 ? c : dk(c, 0.9), [0, ty, 0]));
-  }
-  parts.push(
-    bake(B(Math.max(1.2, (w - d) * 0.45 + 1.1), 0.24, 0.34, 0.08), dk(c, 0.72), [0, y + h + 0.14, 0]),
-    bake(S(0.22, 7, 5), dk(c, 0.68), [0, y + h + 0.26, 0])
-  );
-  return parts;
-};
+// Mái tối giản: 1 tấm viền + 1 khối chóp (bỏ các lớp ngói xếp tầng tốn đỉnh)
+const roof = (w, d, h, c, ov = 0.62, y = 0) => [
+  bake(B(w + ov * 2 + 0.16, 0.22, d + ov * 2 + 0.16, 0.08), dk(c, 0.76), [0, y + 0.1, 0]),
+  bake(Co(1, 1, 4), c, [0, y + 0.18 + h / 2, 0], [0, Math.PI / 4, 0], [(w + ov * 2) / SQ, h, (d + ov * 2) / SQ]),
+];
 
 const wall = (w, h, d, c, y = 0, x = 0, z = 0) => bake(B(w, h, d, 0.14), c, [x, y + h / 2, z]);
 const sign = (text, icon, w, h, bg, fg) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: signTexture(text, { bg, fg, icon, w: 512, h: Math.round((512 * h) / w) }), transparent: true, side: THREE.DoubleSide })); m.castShadow = false; return m; };
-const winAt = (P, Win, x, y, z, ry = 0, flowers = true) => {
+const winAt = (P, Win, x, y, z, ry = 0, flowers = false) => {
   const c = Math.cos(ry), s = Math.sin(ry), rot = [0, ry, 0], pos = (dx, dy, dz) => [x + dx * c + dz * s, y + dy, z - dx * s + dz * c];
   P.push(
     bake(B(1.06, 1.08, 0.12, 0.05), 0x8f5e38, pos(0, 0, 0), rot),
@@ -314,100 +301,40 @@ export function forSale(pen, icon = '🏷️') {
   return g;
 }
 
-// Cửa hàng ở Làng được nâng cấp kiến trúc mái ngói, hiên gỗ, thùng trưng bày và đèn lồng rực rỡ
+// Cửa hàng ở Làng (tối giản): tường + mái + cửa + 2 cửa sổ + bảng hiệu
 export function shop(kind) {
   const def = VILLAGE.shops[kind], c = def.color, P = [], Win = [], w = 7.2, d = 5.2, h = 2.95;
   const wallCol = new THREE.Color(c).lerp(new THREE.Color(0xfff8ec), 0.62).getHex();
   P.push(
     wall(w, h, d, wallCol),
     bake(B(w + 0.42, 0.34, d + 0.42, 0.1), 0xa89b89, [0, 0.17, 0]),
-    // Cột gỗ trang trí 4 góc & hiên gỗ trước cửa
-    ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => bake(B(0.22, h, 0.22, 0.04), W2, [sx * (w / 2 - 0.04), h / 2, sz * (d / 2 - 0.04)]))),
-    bake(B(w + 0.4, 0.16, 1.6, 0.05), 0xd8cab4, [0, 0.08, d / 2 + 0.72]),
-    ...[-3.1, 3.1].map((px) => bake(Cy(0.09, 0.11, 2.55, 6), W2, [px, 1.32, d / 2 + 1.25])),
-    ...roof(w, d, 1.55, dk(c, 0.9), 0.52, h)
+    ...roof(w, d, 1.55, dk(c, 0.9), 0.52, h),
+    bake(B(1.42, 2.08, 0.16, 0.05), 0xd8cbb8, [0, 1.04, d / 2 + 0.02]),
+    bake(B(1.12, 1.88, 0.18, 0.05), 0x7a4a2b, [0, 0.96, d / 2 + 0.04])
   );
-  door(P, w, d, 0x7a4a2b);
-  winAt(P, Win, -2.15, 1.55, d / 2 + 0.02, 0, true);
-  winAt(P, Win, 2.15, 1.55, d / 2 + 0.02, 0, true);
-  for (let i = 0; i < 8; i++) {
-    P.push(bake(B(0.92, 0.1, 1.6, 0.03), i % 2 ? 0xffffff : c, [-3.22 + i * 0.92, 2.6 - 0.02, d / 2 + 0.76], [0.42, 0, 0]));
-  }
-  const deco = {
-    seed: () => [
-      bake(B(1.1, 0.6, 0.75, 0.08), W, [-2.55, 0.35, d / 2 + 1.1]),
-      bake(S(0.22, 6, 5), 0xff8a3d, [-2.8, 0.75, d / 2 + 1.1]),
-      bake(S(0.22, 6, 5), 0xe84a3a, [-2.4, 0.75, d / 2 + 1.1]),
-      bake(S(0.22, 6, 5), 0x5ec248, [-2.6, 0.82, d / 2 + 0.95]),
-      bake(S(0.42, 8, 6), 0xd9b88a, [2.65, 0.45, d / 2 + 1.1], [0, 0, 0], [1, 1.15, 0.9]),
-      bake(Cy(0.32, 0.26, 0.55, 8), 0xb87a45, [1.85, 0.34, d / 2 + 1.15]),
-    ],
-    animal: () => [
-      bake(Cy(0.55, 0.55, 0.82, 10), 0xe0c060, [-2.7, 0.45, d / 2 + 1.1], [0, 0, Math.PI / 2]),
-      bake(Cy(0.46, 0.46, 0.74, 10), 0xd4b250, [-2.5, 0.98, d / 2 + 1.05], [0, 0.2, Math.PI / 2]),
-      bake(S(0.22, 6, 5), 0xfff7e8, [2.6, 0.28, d / 2 + 1.1], [0, 0, 0], [1, 0.85, 1.2]),
-      bake(Cy(0.22, 0.26, 0.65, 10), 0xd8dee6, [1.95, 0.38, d / 2 + 1.15]),
-    ],
-    furniture: () => [
-      bake(B(0.9, 0.52, 0.82, 0.1), 0xe8837c, [-2.65, 0.32, d / 2 + 1.1]),
-      bake(B(0.9, 0.64, 0.18, 0.05), 0xe8837c, [-2.65, 0.72, d / 2 + 0.75]),
-      bake(Cy(0.55, 0.55, 0.06, 12), 0xf09a7a, [2.55, 0.12, d / 2 + 1.18]),
-      bake(Cy(0.06, 0.08, 1.2, 6), W2, [2.55, 0.72, d / 2 + 1.18]),
-      bake(Co(0.38, 0.35, 8), 0xffe4a0, [2.55, 1.35, d / 2 + 1.18]),
-    ],
-    general: () => [
-      bake(Cy(0.42, 0.42, 0.82, 10), W, [-2.7, 0.45, d / 2 + 1.1]),
-      bake(Cy(0.4, 0.4, 0.8, 10), W2, [-1.95, 0.45, d / 2 + 1.1]),
-      bake(B(0.88, 0.54, 0.65, 0.08), 0xd0a060, [2.55, 0.32, d / 2 + 1.1]),
-      bake(S(0.22, 6, 5), 0xe86a6a, [2.45, 0.7, d / 2 + 1.1]),
-      bake(S(0.22, 6, 5), 0xffd23f, [2.75, 0.7, d / 2 + 1.1]),
-    ],
-  }[kind]();
-  P.push(...deco);
+  winAt(P, Win, -2.15, 1.55, d / 2 + 0.02);
+  winAt(P, Win, 2.15, 1.55, d / 2 + 0.02);
   const g = build(P, Win, [rectOf(0, 0, w, d + 0.3, 0.1)]);
   const s = sign(def.name, def.icon, 4.8, 1.22, '#fff4dc', '#6b3e20');
-  s.position.set(0, h + 0.68, d / 2 + 1.22); s.rotation.x = -0.32; g.add(s);
-  const gl = glowSprite(0xffd27a, 3.4, 0.65); gl.position.set(0, 1.6, d / 2 + 1.65); g.add(gl);
-  g.userData.glows = [gl]; g.userData.dims = { w, d };
+  s.position.set(0, h + 0.4, d / 2 + 0.25); g.add(s);
+  g.userData.dims = { w, d };
   return g;
 }
 
-// Cổng Chào Làng Hạnh Phúc hoành tráng ở lối vào Làng (x = 37.2, z = 6)
+// Cổng Chào Làng (tối giản): 2 cột + xà ngang + bảng tên
 export function villageArch() {
-  const span = 5.4, h = 4.6, P = [], Bulbs = [];
-  for (const sz of [-span / 2, span / 2]) {
-    P.push(
-      bake(B(0.75, 0.65, 0.75, 0.08), 0x9a9186, [0, 0.32, sz]),
-      bake(Cy(0.24, 0.28, h, 8), 0xb84634, [0, h / 2 + 0.2, sz]),
-      bake(B(0.55, 0.24, 0.55, 0.04), W2, [0, h + 0.25, sz])
-    );
-    // Đèn lồng đỏ vàng treo hai bên cổng làng
-    P.push(bake(Cy(0.04, 0.04, 0.4, 5), W2, [0, h - 0.55, sz + (sz < 0 ? 0.55 : -0.55)]));
-    Bulbs.push(bake(S(0.22, 8, 6), 0xffb74d, [0, h - 0.82, sz + (sz < 0 ? 0.55 : -0.55)], [0, 0, 0], [0.9, 1.25, 0.9]));
-    // Bồn hoa dưới chân trụ cổng
-    P.push(
-      bake(B(0.95, 0.35, 0.95, 0.06), W, [0, 0.18, sz + (sz < 0 ? -0.75 : 0.75)]),
-      bake(S(0.24, 6, 5), 0x5ab84c, [0, 0.48, sz + (sz < 0 ? -0.75 : 0.75)]),
-      bake(S(0.16, 6, 5), 0xff7aa2, [0.12, 0.64, sz + (sz < 0 ? -0.75 : 0.75)]),
-      bake(S(0.16, 6, 5), 0xffd23f, [-0.12, 0.62, sz + (sz < 0 ? -0.75 : 0.75)])
-    );
-  }
-  // Xà ngang & mái ngói cổng chào
-  P.push(
-    bake(B(0.45, 0.32, span + 1.8, 0.06), W2, [0, h - 0.25, 0]),
+  const span = 5.4, h = 4.6;
+  const P = [
+    ...[-span / 2, span / 2].map((sz) => bake(Cy(0.24, 0.28, h, 8), 0xb84634, [0, h / 2 + 0.2, sz])),
     bake(B(0.52, 0.36, span + 2.4, 0.06), 0xb84634, [0, h + 0.35, 0]),
-    ...roof(1.4, span + 2.6, 1.1, 0xc84332, 0.35, h + 0.5)
-  );
+  ];
   const g = new THREE.Group();
   g.add(M(merge(P), MAT.lit));
-  g.add(M(merge(Bulbs), MAT.bulb, { cast: false, receive: false }));
-  const s1 = sign('LÀNG HẠNH PHÚC • PHỐ ẨM THỰC', '🏘️', 4.6, 0.95, '#fff4dc', '#8f2d1e');
-  s1.position.set(-0.32, h + 0.05, 0); s1.rotation.y = -Math.PI / 2;
-  const s2 = sign('LÀNG HẠNH PHÚC • PHỐ ẨM THỰC', '🍳', 4.6, 0.95, '#fff4dc', '#8f2d1e');
-  s2.position.set(0.32, h + 0.05, 0); s2.rotation.y = Math.PI / 2;
+  const s1 = sign('LÀNG HẠNH PHÚC', '🏘️', 4.6, 0.95, '#fff4dc', '#8f2d1e');
+  s1.position.set(-0.32, h - 0.3, 0); s1.rotation.y = -Math.PI / 2;
+  const s2 = sign('LÀNG HẠNH PHÚC', '🏘️', 4.6, 0.95, '#fff4dc', '#8f2d1e');
+  s2.position.set(0.32, h - 0.3, 0); s2.rotation.y = Math.PI / 2;
   g.add(s1, s2);
-  const gl = glowSprite(0xffc864, 5.5, 0.65); gl.position.set(0, h - 0.6, 0); g.add(gl);
-  g.userData.glows = [gl];
   g.userData.rects = [
     { x0: -0.45, x1: 0.45, z0: -span / 2 - 0.45, z1: -span / 2 + 0.45 },
     { x0: -0.45, x1: 0.45, z0: span / 2 - 0.45, z1: span / 2 + 0.45 },
@@ -532,12 +459,6 @@ export function restaurantShell(level = 1, unlocked = false) {
     bake(B(kw, 0.18, d, 0.03), 0x8294a5, [-w / 2 + kw / 2, 0.1, 0]),
     bake(B(dw, 0.18, d, 0.03), 0xe6d8c3, [w / 2 - dw / 2, 0.1, 0])
   );
-  // Ô gạch caro trong Bếp & Đường vân gỗ bên Phòng Ăn
-  for (let ix = 0; ix < 4; ix++) for (let iz = 0; iz < 5; iz++) {
-    if ((ix + iz) % 2 === 0) {
-      P.push(bake(B(1.9, 0.02, 1.9, 0.01), 0x728495, [-w / 2 + 1.2 + ix * 2.0, 0.19, -d / 2 + 1.3 + iz * 2.0]));
-    }
-  }
   // Thảm vàng chào khách ngay cửa Phòng Ăn (như ảnh mẫu Ready, Set, Cook!)
   P.push(bake(B(1.85, 0.04, 1.15, 0.02), 0xf4c430, [lx(R.door.x), 0.2, lz(R.door.z) - 0.35], [0, -0.15, 0]));
 
@@ -551,28 +472,6 @@ export function restaurantShell(level = 1, unlocked = false) {
     bake(B(0.32, 2.2, d - 2.2, 0.05), 0xdfd0ba, [w / 2 - 0.16, 1.2, -0.8]),
     // Vách ngăn lửng giữa Bếp và Phòng Ăn ở sát tường bắc
     bake(B(0.28, 2.6, 2.1, 0.04), 0x6c7a89, [lx(R.passCounter.x), 1.4, -d / 2 + 1.1])
-  );
-
-  // 3 Khung tranh Thực Đơn phát sáng treo trên tường Phòng Ăn (giống hệt ảnh mẫu Ready, Set, Cook!)
-  for (const dx of [-1.5, 0, 1.5]) {
-    const mx = lx(R.ovalTable.x) + dx - 1.2, mz = -d / 2 + 0.36;
-    P.push(
-      bake(B(1.15, 1.35, 0.08, 0.02), 0x3b2a1e, [mx, 1.85, mz]),
-      bake(B(0.98, 1.16, 0.09, 0.02), 0xffb74d, [mx, 1.85, mz + 0.01]),
-      bake(B(0.76, 0.14, 0.1, 0.01), 0x7c3f1d, [mx, 2.15, mz + 0.02]),
-      bake(B(0.76, 0.14, 0.1, 0.01), 0xc84632, [mx, 1.85, mz + 0.02]),
-      bake(B(0.76, 0.14, 0.1, 0.01), 0x4ca644, [mx, 1.55, mz + 0.02])
-    );
-  }
-
-  // Cây cảnh tán hồng (Pink Blossom Tree) ở góc đông bắc Phòng Ăn (chuẩn ảnh mẫu Ready, Set, Cook!)
-  const tx = w / 2 - 1.45, tz = -d / 2 + 1.35;
-  P.push(
-    bake(Cy(0.45, 0.36, 0.65, 10), 0x8f5e38, [tx, 0.45, tz]),
-    bake(Cy(0.12, 0.16, 1.45, 7), 0x6b442a, [tx, 1.25, tz]),
-    bake(S(0.78, 8, 6), 0xf49ac2, [tx, 2.15, tz], [0, 0, 0], [1.25, 0.72, 1.1]),
-    bake(S(0.62, 8, 6), 0xffb3d1, [tx - 0.55, 1.95, tz + 0.25], [0, 0, 0], [1.15, 0.68, 1.0]),
-    bake(S(0.58, 8, 6), 0xff85b3, [tx + 0.48, 2.0, tz - 0.2], [0, 0, 0], [1.1, 0.68, 1.0])
   );
 
   // 3. QUẦY TRẢ MÓN MÀU ĐỎ CAM (Red-Orange Pass-Through Counter) ngăn cách Bếp và Phòng Ăn
@@ -591,8 +490,7 @@ export function restaurantShell(level = 1, unlocked = false) {
     P.push(
       bake(B(1.85, 0.92, 1.25, 0.06), 0x5c6b7a, [cx, 0.56, cz]),
       bake(B(1.68, 0.24, 1.08, 0.04), W, [cx, 1.08, cz]),
-      // Nguyên liệu 3D đầy ắp bên trong thùng
-      ...[-0.42, 0, 0.42].flatMap((ox) => [-0.22, 0.22].map((oz) => bake(S(0.22, 7, 5), col, [cx + ox, 1.24, cz + oz], [0, 0, 0], [1.05, 0.82, 1.05])))
+      bake(B(1.4, 0.12, 0.8, 0.02), col, [cx, 1.24, cz])
     );
     const lb = sign(cr.name.replace('Thùng ', ''), cr.icon, 1.85, 0.54, '#fff8ec', '#3b2818');
     lb.position.set(cx, 1.78, cz + (cz < 0 ? 0.45 : -0.45));
@@ -696,7 +594,6 @@ export function restaurantShell(level = 1, unlocked = false) {
   const dd = 2.2;
   for (let i = 0; i < 12; i++) {
     P.push(bake(B(w / 12 + 0.05, 0.12, dd, 0.04), i % 2 ? 0xffffff : 0xe85338, [-w / 2 + (i + 0.5) * (w / 12), 3.15, -d / 2 + dd / 2 + 0.2], [0.15, 0, 0]));
-    Bulbs.push(bake(S(0.11, 6, 5), [0xffd23f, 0xff7aa2, 0x7ac0ff][i % 3], [-w / 2 + 0.6 + i * ((w - 1.2) / 11), 2.85, -d / 2 + dd + 0.1]));
   }
 
   g.add(M(merge(P), MAT.lit));
@@ -709,13 +606,6 @@ export function restaurantShell(level = 1, unlocked = false) {
   s.position.set(0, 3.85, -d / 2 + dd + 0.6); s.rotation.x = -0.25;
   g.add(s);
 
-  for (const x of [-w / 4, w / 4]) {
-    const gl = glowSprite(0xffd27a, 5.5, 0.6);
-    gl.position.set(x, 2.8, 0);
-    g.add(gl);
-    (g.userData.glows ||= []).push(gl);
-  }
-
   // Va chạm gọn gàng: chặn tường bắc, tường tây, và tâm bàn Oval để người chơi đi lại mượt mà giữa Bếp và Phòng Ăn!
   g.userData.rects = [
     { x0: -w / 2, x1: w / 2, z0: -d / 2 - 0.3, z1: -d / 2 + 0.45 },
@@ -727,35 +617,11 @@ export function restaurantShell(level = 1, unlocked = false) {
   return g;
 }
 
-// Quảng trường Làng nâng cấp: Đài phun nước lớn + Bồn hoa 4 góc + Dây cờ lễ hội & Đèn lồng treo cao rực rỡ
+// Quảng trường Làng (tối giản): chỉ giữ đài phun nước, bỏ dây đèn lồng & gạch trang trí
 export function plaza() {
   const g = new THREE.Group(), f = buildFurniture('fountain');
   f.scale.setScalar(1.32);
   g.add(f);
-  const P = [], Bulbs = [];
-  // Viền gạch tròn lát quảng trường & 4 trụ đèn dây cờ lễ hội
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2;
-    P.push(bake(B(1.1, 0.08, 0.55, 0.02), i % 2 ? 0xd9604c : 0xf2d27a, [Math.cos(a) * 6.8, 0.04, Math.sin(a) * 6.8], [0, -a, 0]));
-  }
-  const posts = [[-6.5, -5.5], [6.5, -5.5], [-6.5, 5.5], [6.5, 5.5]];
-  for (const [px, pz] of posts) {
-    P.push(
-      bake(Cy(0.1, 0.12, 3.8, 6), W2, [px, 1.9, pz]),
-      bake(S(0.16, 6, 5), 0xffd23f, [px, 3.85, pz])
-    );
-  }
-  // Dây cờ & đèn lồng nối giữa các trụ quảng trường
-  const spans = [[posts[0], posts[1]], [posts[2], posts[3]], [posts[0], posts[2]], [posts[1], posts[3]]];
-  for (const [[x0, z0], [x1, z1]] of spans) {
-    for (let i = 1; i < 8; i++) {
-      const t = i / 8, x = x0 + (x1 - x0) * t, z = z0 + (z1 - z0) * t;
-      const sag = Math.sin(t * Math.PI) * 0.45;
-      Bulbs.push(bake(S(0.13, 6, 5), [0xffcf48, 0xff6b8b, 0x5ec248, 0x5ebee3][i % 4], [x, 3.65 - sag, z]));
-    }
-  }
-  g.add(M(merge(P), MAT.lit));
-  g.add(M(merge(Bulbs), MAT.bulb, { cast: false, receive: false }));
   g.userData.fountain = f;
   g.userData.rects = [{ x0: -2.2, x1: 2.2, z0: -2.2, z1: 2.2 }];
   return g;

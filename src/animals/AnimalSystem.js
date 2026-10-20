@@ -146,7 +146,7 @@ export class AnimalSystem {
       a.growth = Math.min(1, a.growth + 0.18);
     }
     sim.st.players[pid].stats.feed++; sim.touch('players.' + pid); sim.touch('animals.' + a.id);
-    sim.fx({ k: 'burst', kind: 'leaf', x: a.x, z: a.z, y: 0.8, n: 6 }); sim.fx({ k: 'sfx', name: 'munch', x: a.x, z: a.z });
+    sim.fx({ k: 'sfx', name: 'munch', x: a.x, z: a.z });
     sim.fx({ k: 'float', x: a.x, z: a.z, y: 2.2, text: a.growth < 1 ? 'Mau lớn! 🐣✨' : 'Ngon quá! 😋', color: '#fff', to: pid });
     sim.sys('prog').addXp(pid, 2); sim.game({ type: 'feed', pid, animal: a.type, n: 1 });
     return ok();

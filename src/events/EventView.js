@@ -36,7 +36,7 @@ export class EventView {
       m.visible = f.ready && out && (f.x - focus.x) ** 2 + (f.z - focus.z) ** 2 < 55 * 55; m.scale.setScalar(1 + Math.sin(t * 2 + f.x) * 0.04);
     }
     for (const [id, m] of this.forage) if (!fs.has(id)) { this.group.remove(m); this.forage.delete(id); }
-    this.sparkT -= dt; if (this.sparkT <= 0) { this.sparkT = 1.1; const near = [...this.forage.entries()].filter(([, m]) => m.visible && (m.position.x - focus.x) ** 2 + (m.position.z - focus.z) ** 2 < 400); if (near.length) { const m = near[(Math.random() * near.length) | 0][1]; this.ctx.fx.burst('sparkle', m.position.x, 0.7, m.position.z, 1); } }
+    
     // UFO + thiên thạch
     const ufoE = st.events.active.find((e) => e.type === 'ufo'), metE = st.events.active.find((e) => e.type === 'meteor');
     if (ufoE) {

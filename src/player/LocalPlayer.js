@@ -196,7 +196,6 @@ export class LocalPlayer {
         this.vy = 0;
         this.jumping = false;
         g.audio.step_();
-        g.fx.burst(this.area === 'out' ? 'dirt' : 'smoke', this.x, baseY + 0.08, this.z, 4);
       }
     }
 
@@ -211,7 +210,6 @@ export class LocalPlayer {
       this.dustT -= dt;
       if (this.dustT <= 0) {
         this.dustT = 0.14;
-        g.fx.burst('smoke', this.x - Math.sin(this.rot) * 0.32, baseY + 0.08, this.z - Math.cos(this.rot) * 0.32, 1);
       }
     }
     let anim = 'idle';
@@ -429,6 +427,11 @@ export class LocalPlayer {
       if (!this.animal || d < this.animal.d) this.animal = { id: a.id, d, a };
       const def = ANIMALS[a.type], party = a.type === 'chicken' && st.events.party && a._party;
       cand(a.ready || party ? 2 : 6, d, { icon: a.ready ? ITEMS[def.prod.item].icon : party ? '🐔' : '💗', label: party ? 'Bắt gà!' : a.ready ? `Thu ${ITEMS[def.prod.item].name}` : `Vuốt ve ${a.name}`, run: () => { this.play(a.ready ? 'harvest' : 'pet', 0.6); this.send({ type: 'animal.use', id: a.id }); } });
+      // Nút "Cho ăn" hiện thẳng trên màn hình khi đứng gần con vật đang đói (không cần đổi sang dụng cụ 🥣)
+      if (a.type !== 'dog' && !party && a.hunger >= 0.3) {
+        const feedN = bag.feed || 0;
+        cand(a.hunger > 0.6 ? 1 : 3, d, { icon: '🥣', label: feedN ? `Cho ${a.name} ăn (còn ${feedN})` : 'Hết thức ăn 🥣 • Mua ở Tạp Hóa', run: () => { this.play('feed', 0.7); this.send({ type: 'animal.feed', id: a.id }); } });
+      }
     }
     const curArea = inHouse ? 'house' : 'farm', ox = inHouse ? INTERIOR.ox : 0, oz = inHouse ? INTERIOR.oz : 0;
     for (const f of Object.values(st.furniture)) {
@@ -491,7 +494,7 @@ export class LocalPlayer {
           icon = '🌾';
           run = () => this.send({ type: 'farm.expand' });
         } else if (it.kind === 'restShift' || it.kind === 'rest2d') {
-          label = 'Bước vào chơi Ready, Set, Cook! (2D) 👨‍🍳';
+          label = 'Vào Quán';
           icon = '👨‍🍳';
           run = () => g.rsc2d?.open();
         }

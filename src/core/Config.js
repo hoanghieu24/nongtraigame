@@ -16,10 +16,10 @@ export const CFG = {
   AUTOSAVE_S: 20,
 };
 
-// Preset đồ hoạ tối ưu chuyên sâu cho Mobile Web & PC: ưu tiên độ nét ở cự ly gần, cắt giảm vật thể thừa ở xa để đạt 60 FPS mượt mà
+// Preset đồ hoạ (đã hạ độ phân giải, cỏ hoa, hạt hiệu ứng để chống giật trên máy yếu & điện thoại)
 export const QUALITY = {
-  low:    { pr: 1.4,  mobilePr: 1.4,  shadows: false, shadowMap: 512,  grass: 0.18, trees: 0.50, particles: 110, clouds: 4, flowers: 0.22, cullDist: 30 },
-  medium: { pr: 2.0,  mobilePr: 2.0,  shadows: false, shadowMap: 512,  grass: 0.38, trees: 0.70, particles: 220, clouds: 6, flowers: 0.45, cullDist: 36 },
-  high:   { pr: 3.0,  mobilePr: 2.85, shadows: true,  shadowMap: 1024, grass: 0.65, trees: 0.85, particles: 360, clouds: 8, flowers: 0.75, cullDist: 44 },
+  low:    { pr: 1.0,  mobilePr: 1.0,  shadows: false, shadowMap: 512,  grass: 0.10, trees: 0.45, particles: 60,  clouds: 3, flowers: 0.12, cullDist: 28 },
+  medium: { pr: 1.5,  mobilePr: 1.5,  shadows: false, shadowMap: 512,  grass: 0.25, trees: 0.60, particles: 120, clouds: 4, flowers: 0.28, cullDist: 34 },
+  high:   { pr: 2.0,  mobilePr: 2.0,  shadows: true,  shadowMap: 1024, grass: 0.50, trees: 0.80, particles: 200, clouds: 6, flowers: 0.55, cullDist: 42 },
 };
 

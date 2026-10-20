@@ -258,7 +258,6 @@ export class FurnitureView {
       if (!it || it.item !== f.item) { if (it) it.g.parent.remove(it.g); const g = buildFurniture(f.item); (f.area === 'house' ? this.fitems : this.out).add(g); it = { g, item: f.item, area: f.area }; this.items.set(id, it); if (g.userData.glow) this.ctx.world.sky.registerGlow(g.userData.glow); }
       const y = f.area === 'house' ? 0 : groundY(f.x, f.z); it.g.position.set(f.x, y, f.z); it.g.rotation.y = f.rot * (Math.PI / 2);
       if (f.item === 'fountain' || (it.g.userData.update && (f.area === 'house' ? localArea === 'house' : localArea === 'out' && Math.hypot(f.x - camTarget.x, f.z - camTarget.z) < 40))) it.g.userData.update?.(t);
-      if (f.item === 'fountain' && localArea === 'out' && Math.random() < dt * 10) this.ctx.fx.burst('splash', f.x, 1.9, f.z, 1);
     }
     for (const [id, it] of this.items) if (!seen.has(id)) { it.g.parent?.remove(it.g); this.items.delete(id); }
     this.out.visible = localArea === 'out';

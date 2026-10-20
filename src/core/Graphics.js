@@ -21,7 +21,8 @@ export class Gfx {
     this.fps = 60;
     const probe = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl');
     this.level = pref === 'auto' ? detectQuality(probe) : pref;
-    const useAA = true;
+    // Khử răng cưa (MSAA) rất tốn GPU trên điện thoại -> chỉ bật trên máy tính
+    const useAA = !this.mobile && this.level !== 'low';
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: useAA,
