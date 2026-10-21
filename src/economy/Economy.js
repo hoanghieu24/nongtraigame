@@ -5,6 +5,9 @@ import { SPOTS } from '../data/layout.js';
 import { fail, ok } from '../core/result.js';
 import { takeFrom } from '../inventory/Inventory.js';
 
+export const ARCADE_DAILY_LIMITS = { coins: 600, xp: 60, love: 150, gifts: 3 };
+const rewardValue = (value, max) => Number.isFinite(value) ? Math.max(0, Math.min(max, Math.round(value))) : 0;
+
 export class EconomySystem {
   constructor(sim) {
     this.sim = sim; this.id = 'economy';
@@ -18,15 +21,21 @@ export class EconomySystem {
   arcadeReward(pid, { coins = 0, xp = 8, love = 10, label = 'Trò chơi đôi' } = {}) {
     const st = this.sim.st, p = st.players[pid];
     if (!p) return fail('Không tìm thấy người chơi');
-    const c = Math.max(0, Math.min(1200, Math.round(coins)));
+    const daily = st.daily, ledger = (daily.arcadeRewards ??= {});
+    const used = (ledger[pid] ??= { coins: 0, xp: 0, love: 0 });
+    const c = Math.min(rewardValue(coins, ARCADE_DAILY_LIMITS.coins), Math.max(0, ARCADE_DAILY_LIMITS.coins - used.coins));
+    const x = Math.min(rewardValue(xp, ARCADE_DAILY_LIMITS.xp), Math.max(0, ARCADE_DAILY_LIMITS.xp - used.xp));
+    const l = Math.min(rewardValue(love, ARCADE_DAILY_LIMITS.love), Math.max(0, ARCADE_DAILY_LIMITS.love - used.love));
+    used.coins += c; used.xp += x; used.love += l;
     if (c > 0) this.earn(pid, c, { bonus: true });
-    st.economy.loveXp = (st.economy.loveXp || 0) + Math.max(0, love);
-    this.sim.touch('economy');
-    this.sim.sys('prog')?.addXp(pid, Math.max(2, xp));
+    st.economy.loveXp = (st.economy.loveXp || 0) + l;
+    this.sim.touch('economy'); this.sim.touch('daily');
+    this.sim.sys('prog')?.addXp(pid, x);
+    if (!c && !x && !l) { this.sim.toast(pid, 'Đã nhận đủ quà Khu Vui Chơi hôm nay. Bạn vẫn có thể chơi tiếp và phá kỷ lục!', 'info'); return ok({ coins: 0, love: st.economy.loveXp }); }
     this.sim.fx({ k: 'sfx', name: 'coin' });
     this.sim.toast(
       undefined,
-      `🎮 ${p.name} vừa chơi "${label}" nhận +${c} 🪙 & +${love} 💕 Tình Yêu!`,
+      `🎮 ${p.name} vừa chơi "${String(label).slice(0, 80)}" nhận +${c} 🪙 & +${l} 💕 Tình Yêu!`,
       'good'
     );
     return ok({ coins: c, love: st.economy.loveXp });
@@ -34,6 +43,10 @@ export class EconomySystem {
   sendLoveGift(pid, { msg = 'Gửi ngàn trái tim tới người ấy! 💖', love = 20, giftCoins = 100 } = {}) {
     const st = this.sim.st, p = st.players[pid];
     if (!p) return fail('Không tìm thấy người chơi');
+    const daily = st.daily, hasReward = (daily.loveGifts || 0) < ARCADE_DAILY_LIMITS.gifts;
+    love = hasReward ? rewardValue(love, 30) : 0;
+    giftCoins = hasReward ? rewardValue(giftCoins, 120) : 0;
+    if (hasReward) { daily.loveGifts = (daily.loveGifts || 0) + 1; this.sim.touch('daily'); }
     st.economy.loveXp = (st.economy.loveXp || 0) + love;
     st.economy.fund = (st.economy.fund || 0) + giftCoins;
     for (const pl of Object.values(st.players)) {
@@ -51,8 +64,8 @@ export class EconomySystem {
     this.sim.fx({ k: 'sfx', name: 'levelup' });
     this.sim.fx({
       k: 'banner',
-      text: `💖 ${p.name}: "${msg}"`,
-      sub: `+${love} 💕 Điểm Tình Yêu • +${giftCoins} 🪙 vào Quỹ Chung Hiếu & Huyền!`,
+      text: `💖 ${p.name}: "${String(msg).slice(0, 160)}"`,
+      sub: hasReward ? `+${love} 💕 Điểm Tình Yêu • +${giftCoins} 🪙 vào Quỹ Chung Hiếu & Huyền!` : 'Cả nhà đã nhận đủ 3 quà xu hôm nay. Gửi thêm yêu thương và quay lại ngày mai nhé!',
       tone: 'good',
     });
     return ok();

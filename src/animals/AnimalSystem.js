@@ -68,14 +68,17 @@ export class AnimalSystem {
   incubate(pid, { pen = 'coop', animalId = null } = {}) {
     const { sim } = this, st = sim.st, P = PENS[pen], b = st.buildings[pen];
     if (!P || !b?.owned) return fail('Cần mở chuồng này trước!');
+    if (!P.inc || !['coop', 'duck'].includes(pen)) return fail('Chuồng này không có ổ ấp trứng.');
+    if (sim.pos(pid).area === 'house' || !sim.near(pid, P.inc.x, P.inc.z, CFG.REACH + 1.8)) return fail('Lại gần ổ ấp trứng trong chuồng nhé!');
     if (b.inc) return fail(`Lò ấp đang ấp 1 quả trứng rồi (còn ${Math.ceil(b.inc.t)}s)! 🐣`);
     const count = Object.values(st.animals).filter((a) => a.pen === pen).length;
     if (count >= P.cap) return fail(`${P.name} đã đầy (${count}/${P.cap} con)!`);
 
     let golden = false, usedSource = false;
     // 1. Ưu tiên lấy trứng vừa đẻ ngay trong chuồng (của con gà được chọn hoặc bất kỳ con gà nào đang có trứng `a.ready`)
-    const readyHen = (animalId && st.animals[animalId]?.ready ? st.animals[animalId] : null)
-      || Object.values(st.animals).find((a) => a.pen === pen && a.ready);
+    const canUseHen = (a) => a && a.pen === pen && P.kinds.includes(a.type) && a.ready;
+    if (animalId && !canUseHen(st.animals[animalId])) return fail('Con vật này không có trứng trong chuồng đã chọn.');
+    const readyHen = animalId ? st.animals[animalId] : Object.values(st.animals).find(canUseHen);
     if (readyHen) {
       golden = !!readyHen.golden;
       readyHen.ready = false;
@@ -90,6 +93,10 @@ export class AnimalSystem {
       usedSource = true;
     } else if (takeFrom(st.inventory.chest, 'egg', 1)) {
       sim.touch('inventory.chest');
+      usedSource = true;
+    } else if (takeFrom(st.inventory.chest, 'golden_egg', 1)) {
+      sim.touch('inventory.chest');
+      golden = true;
       usedSource = true;
     }
     if (!usedSource) return fail('Cần có 1 quả Trứng 🥚 (đợi gà đẻ hoặc lấy trong túi) để ấp nở gà con!');
@@ -254,10 +261,16 @@ export class AnimalSystem {
       if (!b?.inc || !P) continue;
       b.inc.t -= dt;
       if (b.inc.t <= 0) {
-        const kind = b.inc.type || 'chicken', golden = !!b.inc.golden;
+        const count = Object.values(st.animals).filter((a) => a.pen === pen).length;
+        // Bản lưu cũ có thể đã mua kín chuồng trong lúc ấp: giữ trứng cho tới khi có chỗ.
+        if (count >= P.cap) {
+          b.inc.t = 0;
+          if (!b.inc.waiting) { b.inc.waiting = true; sim.touch('buildings.' + pen); sim.toast(undefined, `🐣 ${P.name} đã đầy. Bán bớt vật nuôi để trứng nở nhé!`, 'warn'); }
+          continue;
+        }
+        const kind = P.kinds.includes(b.inc.type) ? b.inc.type : P.kinds[0], golden = !!b.inc.golden;
         delete b.inc;
         sim.touch('buildings.' + pen);
-        const count = Object.values(st.animals).filter((a) => a.pen === pen).length;
         if (count < P.cap) {
           const ix = P.inc?.x ?? (P.x0 + 2.4), iz = P.inc?.z ?? (P.z0 + 2.0);
           const baby = this.spawn(kind, { pen, baby: true, growth: 0.36, golden, x: ix + 0.4, z: iz + 0.6 });
@@ -300,19 +313,7 @@ export class AnimalSystem {
           if (a.type === 'chicken') sim.fx({ k: 'float', x: a.x, z: a.z, y: 2.0, text: '🥚 Cục tác! Đẻ trứng!', color: '#fff8dc' });
         }
       }
-      // Gà mẹ tự động ấp trứng nếu trứng đẻ ra để quá 25s chưa nhặt và chuồng còn chỗ trống!
-      if (a.ready && (a.type === 'chicken' || a.type === 'duck') && a.pen) {
-        a._eggWait = (a._eggWait || 0) + dt;
-        const b = st.buildings[a.pen], P = PENS[a.pen];
-        const count = list.filter((x) => x.pen === a.pen).length;
-        if (a._eggWait >= 25 && b?.owned && !b.inc && count < P.cap && a.hunger < 0.7) {
-          a.ready = false; a._eggWait = 0;
-          b.inc = { type: a.type, t: INCUBATE_SECONDS, max: INCUBATE_SECONDS, golden: !!a.golden, hen: a.id };
-          a.st = 'idle'; a.sub = 'incubate'; a.timer = 8;
-          sim.touch('animals.' + a.id); sim.touch('buildings.' + a.pen);
-          sim.fx({ k: 'float', x: a.x, z: a.z, y: 2.1, text: '🐣 Gà mẹ bắt đầu ấp trứng!', color: '#ffe066' });
-        }
-      }
+      // Giữ sản phẩm tới khi người chơi thu hoặc chủ động đưa trứng vào ổ ấp.
       if (a.golden && a._goldenUntil && t > a._goldenUntil) { a.golden = false; sim.touch('animals.' + a.id); }
       a._petCd -= dt; a._xpCd -= dt; a._charge -= dt; a._cd -= dt; a._bump -= dt;
       // ---- âm thanh ngẫu nhiên khi có người ở gần ----

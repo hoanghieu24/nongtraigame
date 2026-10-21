@@ -8,6 +8,7 @@
 //   5. 🐾 Đua Thú Cưng Nông Trại (Cổ vũ Mèo Mimi, Cún Bông, Vịt Vàng, Thỏ Trắng)
 // ============================================================================
 import { esc } from '../core/util.js';
+import { ARCADE_DAILY_LIMITS } from '../economy/Economy.js';
 
 const LOVE_RANKS = [
   { lvl: 1, need: 0, title: '🌱 Mới Quen Ngại Ngùng' },
@@ -536,6 +537,8 @@ export class CoupleArcade {
   // ---------------- RENDER GIAO DIỆN ----------------
   render(st, me) {
     const lv = this.getLoveInfo(st);
+    const arcadeLeft = Math.max(0, ARCADE_DAILY_LIMITS.coins - (st.daily?.arcadeRewards?.[me?.id]?.coins || 0));
+    const giftsLeft = Math.max(0, ARCADE_DAILY_LIMITS.gifts - (st.daily?.loveGifts || 0));
     const tabs = [
       ['love', '💕 Hiếu ❤️ Huyền'],
       ['mole', '🔨 Đập Chuột'],
@@ -552,6 +555,7 @@ export class CoupleArcade {
           <i class="bar xp"><u style="width:${lv.pct}%;background:linear-gradient(90deg,#ec4899,#f43f5e,#fbbf24)"></u></i>
         </div>
       </div>
+      <p class="muted">🎁 Hôm nay còn ${arcadeLeft}/${ARCADE_DAILY_LIMITS.coins} xu thưởng trò chơi cho bạn • ${giftsLeft}/${ARCADE_DAILY_LIMITS.gifts} quà xu cho cả nhà. Làm mới lúc 00:00 Việt Nam.</p>
       <div class="tabs">${tabs.map(([k, n]) => `<button class="b ${this.tab === k ? 'on' : ''}" data-a="arcTab" data-t="${k}">${n}</button>`).join('')}</div>
     `;
 
@@ -559,11 +563,11 @@ export class CoupleArcade {
       const q = COUPLE_QUIZZES[this.quizIdx % COUPLE_QUIZZES.length];
       h += `
         <div class="mc">
-          <h5>💌 Tương Tác Ngọt Ngào Giữa Hiếu & Huyền <small>(Bấm là cả 2 máy cùng nhận pháo hoa & Xu!)</small></h5>
+          <h5>💌 Tương Tác Ngọt Ngào Giữa Hiếu & Huyền <small>${giftsLeft ? `Còn ${giftsLeft} quà xu chung hôm nay` : 'Tiếp tục gửi yêu thương 💕'}</small></h5>
           <div class="row wrap">
-            <button class="b go" data-a="arcLoveGift" data-k="heart">💖 Bắn Mưa Tim (+80🪙)</button>
-            <button class="b" data-a="arcLoveGift" data-k="rose">🌹 Tặng Hoa Hồng (+120🪙)</button>
-            <button class="b" data-a="arcLoveGift" data-k="boba">🧋 Mời Trà Sữa (+100🪙)</button>
+            <button class="b go" data-a="arcLoveGift" data-k="heart">💖 Bắn Mưa Tim${giftsLeft ? ' (+80🪙)' : ''}</button>
+            <button class="b" data-a="arcLoveGift" data-k="rose">🌹 Tặng Hoa Hồng${giftsLeft ? ' (+120🪙)' : ''}</button>
+            <button class="b" data-a="arcLoveGift" data-k="boba">🧋 Mời Trà Sữa${giftsLeft ? ' (+100🪙)' : ''}</button>
           </div>
         </div>
         <div class="mc">

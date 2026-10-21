@@ -7,10 +7,13 @@ import { SPOTS, plotPos, PLOT, REST, INTERIOR, HOME_KITCHEN, FISH_SPOTS, PENS } 
 import { RECIPES } from '../src/data/recipes.js';
 import { timeInfo } from '../src/core/util.js';
 import { CFG } from '../src/core/Config.js';
+import { WEEKLY_GOALS } from '../src/quests/QuestSystem.js';
+import { ARCADE_DAILY_LIMITS } from '../src/economy/Economy.js';
 
 let pass = 0; const t = (name, fn) => { try { fn(); pass++; console.log('  ✓', name); } catch (e) { console.error('  ✗', name, '\n   ', e.stack.split('\n').slice(0, 4).join('\n    ')); process.exitCode = 1; } };
-const mk = (seed = 7) => { const store = new Store(createGameState({ farmName: 'Test', hostId: 'p1', roomCode: 'ABC123' })); const sim = new Sim(store, { seed }); sim.addPlayer({ id: 'p1', name: 'An' }); return { store, sim, st: store.state }; };
-const run = (sim, secs, dt = 0.1) => { for (let i = 0; i < secs / dt; i++) sim.tick(0.1); };
+const TEST_NOW = Date.parse('2026-10-21T05:00:00Z');
+const mk = (seed = 7, opts = {}) => { const store = new Store(createGameState({ farmName: 'Test', hostId: 'p1', roomCode: 'ABC123' })); const sim = new Sim(store, { seed, now: () => TEST_NOW, ...opts }); sim.addPlayer({ id: 'p1', name: 'An' }); return { store, sim, st: store.state }; };
+const run = (sim, secs, dt = 0.1) => { for (let i = 0; i < Math.ceil(secs / dt); i++) sim.tick(Math.min(dt, secs - i * dt)); };
 const at = (sim, pid, x, z, extra = {}) => sim.setPose(pid, { x, z, rot: 0, area: 'out', ...extra });
 const ex = (sim, pid, type, c = {}) => sim.exec(pid, { type, ...c });
 
@@ -47,6 +50,19 @@ t('cây mọc lại (cà chua) & mưa tự tưới', () => {
   ex(sim, 'p1', 'farm.harvest', { plot: 'p0_2' }); assert.equal(st.crops.p0_2.s, 'planted'); assert.ok(st.crops.p0_2.g >= 0.4);
 });
 
+t('cây mọc lại chỉ được tăng tốc hướng dẫn ở vụ đầu', () => {
+  const { sim, st } = mk(); st.farm.level = 2;
+  const p = plotPos(0, 0); at(sim, 'p1', p.x, p.z);
+  sim.addItem('p1', 'seed_tomato');
+  assert.ok(ex(sim, 'p1', 'farm.till', { plot: 'p0_0' }).ok);
+  assert.ok(ex(sim, 'p1', 'farm.plant', { plot: 'p0_0', crop: 'tomato' }).ok);
+  assert.equal(st.crops.p0_0.fast, 1);
+  st.crops.p0_0.s = 'ripe'; st.crops.p0_0.g = 1;
+  assert.ok(ex(sim, 'p1', 'farm.harvest', { plot: 'p0_0' }).ok);
+  assert.equal(st.crops.p0_0.s, 'planted');
+  assert.equal(st.crops.p0_0.fast, undefined, 'vụ sau trở về đúng tốc độ');
+});
+
 console.log('Vật nuôi');
 t('khởi tạo: chó + 2 gà; cho ăn → đẻ trứng → thu', () => {
   const { sim, st } = mk(); const as = Object.values(st.animals); assert.equal(as.filter((a) => a.type === 'chicken').length, 2); assert.equal(as.filter((a) => a.type === 'dog').length, 1);
@@ -80,6 +96,41 @@ t('đóng cửa chuồng gà không đi ra được; ấp trứng nở gà con r
   assert.equal(chicks.length, 1, 'đã nở ra 1 gà con');
   for (let i = 0; i < 950; i++) { chicks[0].hunger = 0.1; sim.tick(0.1); }
   assert.equal(chicks[0].growth, 1, 'gà con đã lớn thành gà trưởng thành');
+});
+
+t('ổ ấp kiểm tra khoảng cách, đúng chuồng và giữ chỗ cho thú sắp nở', () => {
+  const { sim, st } = mk(); const P = PENS.coop;
+  const hen = Object.values(st.animals).find((a) => a.type === 'chicken'); hen.ready = true;
+  assert.equal(ex(sim, 'p1', 'animal.incubate', { pen: 'coop' }).ok, false, 'không ấp từ xa');
+  assert.equal(hen.ready, true, 'không mất trứng khi thao tác thất bại');
+  st.buildings.barn = { owned: true };
+  at(sim, 'p1', P.inc.x, P.inc.z);
+  assert.equal(ex(sim, 'p1', 'animal.incubate', { pen: 'barn', animalId: hen.id }).ok, false, 'không ấp trứng thành bò');
+  st.buildings.duck = { owned: true };
+  const duck = sim.sys('animal').spawn('duck', { pen: 'duck' }); duck.ready = true;
+  assert.equal(ex(sim, 'p1', 'animal.incubate', { pen: 'coop', animalId: duck.id }).ok, false, 'không lấy sản phẩm của con vật ở chuồng khác');
+  for (let i = 0; i < 5; i++) sim.sys('animal').spawn('chicken', { pen: 'coop' });
+  assert.ok(ex(sim, 'p1', 'animal.incubate', { pen: 'coop', animalId: hen.id }).ok);
+  st.players.p1.money = 1000; at(sim, 'p1', P.gate.x, P.gate.z);
+  assert.equal(ex(sim, 'p1', 'shop.buy', { shop: 'animal', key: 'animal:chicken' }).ok, false, 'trứng đang ấp đã giữ chỗ cuối cùng');
+  run(sim, 41);
+  assert.equal(Object.values(st.animals).filter((a) => a.pen === 'coop').length, P.cap);
+  assert.equal(st.buildings.coop.inc, undefined);
+});
+
+t('sản phẩm vật nuôi chờ thu; trứng đang ấp không mất khi chuồng trong save cũ đã đầy', () => {
+  const { sim, st } = mk(); const P = PENS.coop;
+  const hen = Object.values(st.animals).find((a) => a.type === 'chicken'); hen.ready = true;
+  run(sim, 30);
+  assert.equal(hen.ready, true, 'không tự ý lấy trứng của người chơi để nhân đàn');
+  assert.equal(st.buildings.coop.inc, undefined);
+  while (Object.values(st.animals).filter((a) => a.pen === 'coop').length < P.cap) sim.sys('animal').spawn('chicken', { pen: 'coop' });
+  st.buildings.coop.inc = { type: 'chicken', t: 0.1, max: 40, golden: true };
+  run(sim, 1);
+  assert.equal(st.buildings.coop.inc.t, 0, 'giữ trứng đã ấp xong');
+  sim.sys('animal').remove(hen.id); sim.tick(0.1);
+  assert.equal(st.buildings.coop.inc, undefined);
+  assert.ok(Object.values(st.animals).some((a) => a.pen === 'coop' && a.golden && a.growth < 1), 'nở ngay khi có chỗ');
 });
 t('gà chui vào nhà rồi chạy ra (khi mở cửa chuồng); heo lăn bùn; dê húc người', () => {
   const { sim, st } = mk(); st.farm.level = 4; st.buildings.coop.open = true; st.buildings.pig = { owned: true }; st.buildings.goat = { owned: true };
@@ -151,6 +202,62 @@ t('điểm danh 7 ngày + vòng quay may mắn + rương năng động hằng ng
   assert.ok(st.daily.activity >= 25, 'tích đủ điểm năng động mở Rương Đồng');
   assert.ok(ex(sim, 'p1', 'quest.dailyChest', { idx: 0 }).ok, 'mở Rương Đồng 25 điểm năng động');
   assert.equal(st.daily.chests[0], true);
+});
+
+t('ngày thưởng theo 00:00 Việt Nam, độc lập ngày trong game và giữ vé đã kiếm', () => {
+  let now = Date.parse('2026-10-21T16:59:59Z');
+  const { sim, st } = mk(7, { now: () => now });
+  assert.equal(st.daily.calendarDate, '2026-10-21');
+  assert.ok(ex(sim, 'p1', 'quest.dailyClaim').ok);
+  st.daily.spinTickets = 7; st.daily.chests = [true, true, true]; st.daily.activity = 100;
+  sim.newDay();
+  assert.equal(ex(sim, 'p1', 'quest.dailyClaim').ok, false, 'ngủ qua ngày trong game không nhận lại quà lịch');
+  now += 1000;
+  assert.ok(ex(sim, 'p1', 'quest.dailyClaim').ok, 'lệnh đầu tiên sau nửa đêm nhận đúng ngày mới');
+  assert.equal(st.daily.calendarDate, '2026-10-22'); assert.equal(st.daily.streak, 2);
+  assert.deepEqual(st.daily.chests, [false, false, false]); assert.equal(st.daily.activity, 15);
+  assert.equal(st.daily.spinTickets, 7, 'vé từ phần thưởng không bị cắt về giới hạn vé miễn phí');
+  st.daily.activity = 95; st.daily.activityTicketClaimed = false;
+  sim.game({ type: 'plant', pid: 'p1', n: 1 });
+  assert.equal(st.daily.spinTickets, 8, 'đạt100 năng động vẫn nhận vé dù đã có5 vé');
+  now = Date.parse('2026-10-24T05:00:00Z');
+  assert.ok(ex(sim, 'p1', 'quest.dailyClaim').ok); assert.equal(st.daily.streak, 1, 'bỏ lỡ ngày reset chuỗi');
+  now = Date.parse('2026-10-23T05:00:00Z');
+  assert.equal(ex(sim, 'p1', 'quest.dailyClaim').ok, false, 'đổi đồng hồ lùi không nhận trùng quà');
+});
+
+t('quà chung trả cả thành viên offline, nội thất chung chỉ tặng một lần', () => {
+  const { sim, st } = mk(); sim.addPlayer({ id: 'p2' }); sim.removePlayer('p2');
+  st.quests.list = []; st.daily.streak = 6;
+  const moneyBefore = st.players.p2.money, lampBefore = st.inventory.stash.lamp || 0;
+  assert.ok(ex(sim, 'p1', 'quest.dailyClaim').ok);
+  assert.equal(st.players.p2.money - moneyBefore, 850, 'thành viên offline nhận đúng xu ngày6 và thưởng chuỗi');
+  assert.equal(st.inventory.stash.lamp, lampBefore + 1);
+  st.daily.activity = 100;
+  const afterClaim = st.players.p2.money;
+  assert.ok(ex(sim, 'p1', 'quest.dailyChest', { idx: 0 }).ok);
+  assert.equal(st.players.p2.money, afterClaim + 150);
+  const beforeWeekly = st.players.p2.money;
+  sim.game({ type: 'harvest', pid: 'p1', n: WEEKLY_GOALS[0].target });
+  assert.equal(st.players.p2.money, beforeWeekly + WEEKLY_GOALS[0].coins);
+  sim.game({ type: 'harvest', pid: 'p1', n: WEEKLY_GOALS[0].target });
+  assert.equal(st.players.p2.money, beforeWeekly + WEEKLY_GOALS[0].coins, 'mốc tuần không trả trùng');
+  sim.addPlayer({ id: 'p2' });
+  assert.equal(ex(sim, 'p2', 'quest.dailyClaim').ok, false, 'kết nối lại không nhận thêm');
+  const beforeFurn = st.inventory.stash.bench || 0;
+  sim.sys('quest').finish({ id: 'furn-test', reward: { coins: 0, xp: 0, furn: 'bench' } });
+  assert.equal(st.inventory.stash.bench, beforeFurn + 1, 'quà nội thất nhiệm vụ cũng chỉ vào kho chung1 lần');
+});
+
+t('mốc tuần giữ qua ngày game và reset đúng thứ Hai Việt Nam', () => {
+  let now = Date.parse('2026-10-25T16:59:59Z');
+  const { sim, st } = mk(7, { now: () => now }); st.quests.list = [];
+  sim.game({ type: 'feed', pid: 'p1', n: 3 });
+  assert.equal(st.weekly.week, '2026-10-19'); assert.equal(st.weekly.progress.feed, 3);
+  sim.newDay(); assert.equal(st.weekly.progress.feed, 3);
+  now += 1000; sim.tick(1.1);
+  assert.equal(st.weekly.week, '2026-10-26'); assert.equal(st.weekly.progress.feed, 0);
+  assert.deepEqual(st.weekly.claimed, []); assert.equal(st.weekly.bonusClaimed, false);
 });
 t('mọi sự kiện chạy được & kết thúc', () => {
   for (const type of ['rain', 'ufo', 'chicken_party', 'golden_animal', 'merchant', 'meteor', 'thief', 'fishing_contest']) {
@@ -438,5 +545,47 @@ t('KitchenLogic: PlayerController + StationLogic + CrisisManager + DifficultyDir
   assert.equal(mockHost.earned, earnedBefore + 200, 'thưởng nóng +200 xu khi hoàn thành 180s');
   assert.equal(mockHost.difficultyDirector.phase, 3, 'giữ nguyên mở khoá toàn bộ thực đơn Phase 3');
 });
+t('quà arcade và quà tình yêu có hạn mức ngày, dữ liệu thưởng lỗi không tạo NaN', () => {
+  const { sim, st } = mk(); sim.addPlayer({ id: 'p2', name: 'B' });
+  const before = st.players.p1.money, partner = st.players.p2.money;
+  for (let i = 0; i < 30; i++) ex(sim, 'p1', 'economy.arcadeReward', { coins: 400, xp: 30, love: 40 });
+  assert.equal(st.players.p1.money - before, ARCADE_DAILY_LIMITS.coins);
+  assert.equal(st.daily.arcadeRewards.p1.xp, ARCADE_DAILY_LIMITS.xp);
+  const fund = st.economy.fund;
+  for (let i = 0; i < 12; i++) ex(sim, 'p1', 'economy.sendLoveGift', { giftCoins: 120, love: 30 });
+  assert.equal(st.players.p2.money - partner, ARCADE_DAILY_LIMITS.gifts * 120);
+  assert.equal(st.economy.fund - fund, ARCADE_DAILY_LIMITS.gifts * 120);
+  ex(sim, 'p2', 'economy.arcadeReward', { coins: Infinity, xp: NaN, love: -200 });
+  assert.ok(Number.isFinite(st.players.p2.money));
+  assert.equal(st.daily.arcadeRewards.p2.coins, 0);
+});
+
+t('ngủ cập nhật ngày và nhiệm vụ ngay lập tức; đứng ngoài nhà không ngủ được', () => {
+  const { sim, st } = mk();
+  setHour(st, 23); sim.tick(0.1);
+  at(sim, 'p1', 0, 0);
+  assert.equal(ex(sim, 'p1', 'clock.sleep').ok, false);
+  const bed = st.furniture.f_bed0, day = st.world.day;
+  at(sim, 'p1', INTERIOR.ox + bed.x, INTERIOR.oz + bed.z + 1, { area: 'house' });
+  let mornings = 0; sim.bus.on('game', (e) => { if (e.type === 'new_day') mornings++; });
+  assert.ok(ex(sim, 'p1', 'clock.sleep').ok);
+  assert.equal(st.world.day, day + 1);
+  assert.equal(st.quests.day, st.world.day);
+  assert.equal(sim.ti.hour, 6);
+  assert.equal(mornings, 1);
+  sim.tick(0.1); assert.equal(mornings, 1, 'không tạo nhiệm vụ ngày mới hai lần');
+});
+
+t('load giữ hàng ruộng đã mua và lên nhiều cấp vẫn nhận đủ mũ', () => {
+  const { sim, st } = mk();
+  st.farm.plotRows = 4;
+  const loaded = migrate(JSON.parse(JSON.stringify(st)));
+  assert.equal(loaded.farm.plotRows, 4, 'không thu hồi hàng ruộng trống đã mua');
+  sim.sys('prog').addXp('p1', 3100);
+  assert.ok(st.players.p1.hats.includes('cap'));
+  assert.ok(st.players.p1.hats.includes('flower'));
+  assert.ok(st.players.p1.hats.includes('cowboy'));
+});
+
 console.log(`\n${pass} test đạt`);
 

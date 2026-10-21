@@ -46,6 +46,8 @@ export function createGameState({ farmName = 'Nông Trại Gia Đình', hostId =
       spinTickets: 1,
       activity: 0,
       activityTicketClaimed: false,
+      arcadeRewards: {},
+      loveGifts: 0,
       chests: [false, false, false],
       fortune: 0,
       lastPrize: '',
@@ -85,11 +87,13 @@ export function createPlayer(id, profile = {}, slot = 0, farmLevel = 1) {
 // Điền các nhánh còn thiếu khi load save cũ (forward-compat)
 export function migrate(st) {
   const d = createGameState();
+  if (st.meta && st.meta.fresh === undefined && (Object.keys(st.players || {}).length || Object.keys(st.animals || {}).length)) st.meta.fresh = false;
   for (const k of Object.keys(d)) if (st[k] === undefined) st[k] = d[k];
   for (const k of ['meta', 'world', 'farm', 'economy', 'daily', 'events', 'restaurant', 'inventory', 'house'])
     for (const kk of Object.keys(d[k])) if (st[k][kk] === undefined) st[k][kk] = d[k][kk];
   if (!Array.isArray(st.daily.chests)) st.daily.chests = [false, false, false];
   if (!Array.isArray(st.weekly?.claimed)) st.weekly = { week: '', progress: { harvest: 0, collect: 0, feed: 0 }, claimed: [], bonusClaimed: false };
+  st.weekly.progress = { harvest: 0, collect: 0, feed: 0, ...st.weekly.progress };
   if (!st.restaurant.shift) st.restaurant.shift = { active: false, by: '', startedAt: 0, served: 0, earned: 0, combo: 0, lastServeAt: 0 };
   if (!st.restaurant.boards) st.restaurant.boards = {};
   if (!Array.isArray(st.restaurant.pass)) st.restaurant.pass = [];
@@ -116,11 +120,17 @@ export function migrate(st) {
       if (st.furniture.f_bookshelf0) Object.assign(st.furniture.f_bookshelf0, STARTER_FURNITURE.f_bookshelf0);
     }
   }
-  // Nếu save cũ đang ở mặc định 4 hàng nhưng chưa trồng quá hàng 2 và ở cấp 1, đồng bộ về 2 hàng (6 ô khởi đầu)
-  if (!st.farm.plotRows || st.farm.plotRows < PLOT.rows0 || (st.farm.plotRows === 4 && st.farm.level === 1 && !Object.values(st.crops || {}).some((c) => c.r >= PLOT.rows0))) {
+  // Giữ mọi hàng ruộng đã mua, kể cả khi chưa trồng cây ở hàng mới.
+  if (!st.farm.plotRows || st.farm.plotRows < PLOT.rows0) {
     st.farm.plotRows = PLOT.rows0;
   }
-  for (const p of Object.values(st.players)) {
+  for (const [id, p] of Object.entries(st.players)) {
+    const defaults = createPlayer(id);
+    for (const k of Object.keys(defaults)) if (p[k] === undefined) p[k] = defaults[k];
+    p.stats = { ...defaults.stats, ...p.stats };
+    if (!Number.isFinite(p.xp)) p.xp = 0;
+    if (!Number.isFinite(p.money)) p.money = CFG.START_COINS;
+    st.inventory.players[id] ??= {};
     if (!Number.isFinite(p.food)) p.food = 100;
     if (!Number.isFinite(p.hp)) p.hp = 100;
     p.food = Math.max(0, Math.min(100, p.food)); p.hp = Math.max(1, Math.min(100, p.hp));

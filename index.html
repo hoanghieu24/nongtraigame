@@ -7,9 +7,6 @@
   <meta name="mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-capable" content="yes" /><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="description" content="Farm Family Party — game nông trại cozy 3D cho 2–4 người, chơi mượt trên điện thoại và trình duyệt." />
   <link rel="manifest" href="./manifest.webmanifest" /><link rel="icon" href="./icon.svg" type="image/svg+xml" /><link rel="apple-touch-icon" href="./icon-192.png" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet" />
   <style>
     /* Critical CSS chống lỗi trắng trang / FOUC trên trình duyệt di động */
     .hidden{display:none!important}
@@ -18,16 +15,6 @@
     canvas#c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
   </style>
   <link rel="stylesheet" href="./src/style.css" />
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-      "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/",
-      "canvas-confetti": "https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.4/+esm",
-      "peerjs": "https://cdn.jsdelivr.net/npm/peerjs@1.5.5/+esm"
-    }
-  }
-  </script>
   <title>Farm Family Party</title>
 </head>
 <body>

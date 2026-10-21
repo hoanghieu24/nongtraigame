@@ -44,8 +44,8 @@ export class ShopSystem {
     if (row.kind === 'animal') {
       const pen = ANIMALS[row.ref].pen;
       if (!st.buildings[pen]?.owned) return fail(`Cần mua ${PENS[pen].name} trước!`);
-      const n = Object.values(st.animals).filter((a) => a.pen === pen).length;
-      if (n >= PENS[pen].cap) return fail(`Chuồng đầy rồi (${n}/${PENS[pen].cap})!`);
+      const n = Object.values(st.animals).filter((a) => a.pen === pen).length + (st.buildings[pen].inc ? 1 : 0);
+      if (n >= PENS[pen].cap) return fail(`Chuồng đầy rồi (${n}/${PENS[pen].cap}, tính cả trứng đang ấp)!`);
     }
     if (row.kind === 'hat' && p.hats.includes(row.ref)) { p.char.hat = row.ref; sim.touch('players.' + pid); return ok(); }
     const eco = sim.sys('economy'), paid = eco.pay(pid, cost, row.pay);

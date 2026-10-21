@@ -10,6 +10,8 @@ import { buildFurniture } from '../art/FurnitureModels.js';
 import { bake, merge, Cy, Co, S, B, To, M, MAT } from '../art/Kit.js';
 import { PENS, VILLAGE, SPOTS, HOUSE, REST, AREAS, groundY, terrainH, DOCK, BRIDGE, PLOT } from '../data/layout.js';
 
+const SHARED_MATERIALS = new Set(Object.values(MAT));
+
 // World = phần "cứng" của thế giới (địa hình, công trình, vùng khoá). Không giữ state game, chỉ đọc state để hiển thị.
 export class World {
   constructor(gfx, fx) {
@@ -17,6 +19,9 @@ export class World {
     this.group = new THREE.Group(); this.scene.add(this.group);
     this.villageGroup = new THREE.Group(); this.group.add(this.villageGroup);
     this.beachGroup = new THREE.Group(); this.group.add(this.beachGroup);
+    this.viewFrustum = new THREE.Frustum(); this.viewMatrix = new THREE.Matrix4();
+    this.villageBounds = new THREE.Box3(new THREE.Vector3(32, -2, -35), new THREE.Vector3(73, 15, 24));
+    this.beachBounds = new THREE.Box3(new THREE.Vector3(-18, -2, 42), new THREE.Vector3(20, 6, 56));
     this.rects = []; this.circles = []; this.dyn = {}; this.dynRects = {}; this.gateG = {}; this.interactables = []; this.windmills = []; this.t = 0; this.smokeT = 0; this.snowK = 0;
     // Trên điện thoại dùng luôn texture địa hình 512px sắc nét ngay từ đầu, tránh chạy upgradeTerrain ngầm gây khựng khung hình lúc mới vào game
     this.terrain = buildTerrain(gfx.level === 'low' ? 384 : 512); this.group.add(this.terrain); if (!gfx.mobile && gfx.level === 'high') upgradeTerrain(this.terrain, 1024);
@@ -35,6 +40,20 @@ export class World {
   }
   addStatic(g, x, z, ry = 0, targetGroup = this.group) { this.place(g, x, z, ry, undefined, targetGroup); this.addRects(g, x, z, ry); for (const gl of g.userData.glows || []) this.sky.registerGlow(gl); return g; }
   addInteract(o) { this.interactables.push({ r: 2.6, ...o }); }
+  removeStatic(root) {
+    if (!root) return;
+    this.sky.unregisterGlows(root);
+    root.removeFromParent();
+    root.traverse((o) => {
+      o.geometry?.dispose();
+      const materials = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mat of materials) if (mat && !SHARED_MATERIALS.has(mat)) {
+        // Sprite dùng chung atlas bóng/ánh sáng; bảng biển có texture riêng.
+        if (!o.isSprite) mat.map?.dispose();
+        mat.dispose();
+      }
+    });
+  }
   buildStatic() {
     // Lối vào & vật dụng quanh nhà
     this.addStatic(Bld.chest(), SPOTS.chest.x, SPOTS.chest.z);
@@ -98,9 +117,11 @@ export class World {
   }
   // đồng bộ phần động theo state (nhà, chuồng, nhà hàng, vùng khoá)
   sync(st) {
+    let collisionDirty = !this._ar;
     if (this.houseLevel !== st.farm.houseLevel) {
-      if (this.houseG) { this.group.remove(this.houseG); this.rects = this.rects.filter((r) => r !== this.houseRect); }
-      if (this.houseUpSign) { this.group.remove(this.houseUpSign); this.houseUpSign = null; }
+      collisionDirty = true;
+      if (this.houseG) { this.removeStatic(this.houseG); this.rects = this.rects.filter((r) => !this.houseRects?.includes(r)); }
+      if (this.houseUpSign) { this.removeStatic(this.houseUpSign); this.houseUpSign = null; }
       const g = Bld.house(st.farm.houseLevel), d = g.userData.dims.d, z = -13.4 - d / 2; this.houseLevel = st.farm.houseLevel; this.houseG = g; this.place(g, HOUSE.x, z, 0);
       const wr = g.userData.rects.map((r) => ({ x0: HOUSE.x + r.x0, x1: HOUSE.x + r.x1, z0: z + r.z0, z1: z + r.z1 })); this.rects.push(...wr); this.houseRect = wr[0]; this.houseRects = wr;
       for (const gl of g.userData.glows || []) this.sky.registerGlow(gl); this.chimney = new THREE.Vector3(HOUSE.x + g.userData.smoke.position.x, g.userData.smoke.position.y, z + g.userData.smoke.position.z);
@@ -115,7 +136,7 @@ export class World {
       if (cur === owned) continue;
       this.penState[k] = owned;
       const slot = this.penGroups[k];
-      if (slot.signG) { this.group.remove(slot.signG); slot.signG = null; }
+      if (slot.signG) { this.removeStatic(slot.signG); slot.signG = null; }
       if (!owned) {
         const isRightGate = Math.abs(p.gate.x - p.x1) < 0.1;
         const sx = p.gate.x + (isRightGate ? 1.35 : -1.35), sz = p.gate.z + 1.85;
@@ -135,13 +156,15 @@ export class World {
         this.gateG[k] = { g, v: b?.open ? 1 : 0, dir: isRightGate ? -1 : 1 };
       }
       const isOpen = !!(b?.owned && b?.open);
-      this.gateG[k].open = isOpen;
-      if (isOpen) delete this.dynRects[k];
-      else this.dynRects[k] = { x0: gx - 0.28, x1: gx + 0.28, z0: gz - 1.4, z1: gz + 1.4 };
+      if (this.gateG[k].open !== isOpen) {
+        this.gateG[k].open = isOpen; collisionDirty = true;
+        if (isOpen) delete this.dynRects[k];
+        else this.dynRects[k] = { x0: gx - 0.28, x1: gx + 0.28, z0: gz - 1.4, z1: gz + 1.4 };
+      }
     }
     const rows = st.farm.plotRows;
     if (this.rowsKey !== rows) {
-      if (this.expandG) { this.group.remove(this.expandG); this.expandG = null; } this.rowsKey = rows;
+      if (this.expandG) { this.removeStatic(this.expandG); this.expandG = null; } this.rowsKey = rows;
       if (rows < PLOT.maxRows) {
         const cx = PLOT.x0 + ((PLOT.cols - 1) * PLOT.sp) / 2;
         const z = PLOT.z0 + (rows - 1) * PLOT.sp + 2.05;
@@ -155,7 +178,8 @@ export class World {
     for (const [k, g] of Object.entries(this.gates)) { const open = !!st.farm.areas[k]; if (g.visible === open) { g.visible = !open; } }
     const rk = `${st.restaurant.unlocked}:${st.restaurant.stars || 1}`;
     if (this.restKey !== rk) {
-      if (this.restG) { this.villageGroup.remove(this.restG); this.rects = this.rects.filter((r) => !this.restRects?.includes(r)); }
+      collisionDirty = true;
+      if (this.restG) { this.removeStatic(this.restG); this.rects = this.rects.filter((r) => !this.restRects?.includes(r)); }
       this.restKey = rk;
       const g = Bld.restaurantShell(st.restaurant.stars || 1, st.restaurant.unlocked);
       this.restG = g;
@@ -165,7 +189,7 @@ export class World {
       this.restRects = this.rects.slice(before);
       for (const gl of g.userData.glows || []) this.sky.registerGlow(gl);
     }
-    this._ar = this.rects.concat(Object.values(this.dynRects));
+    if (collisionDirty) this._ar = this.rects.concat(Object.values(this.dynRects));
     const mer = !!st.events.active.some((e) => e.type === 'merchant'); if (this.merchant.visible !== mer) this.merchant.visible = mer;
   }
   applyMode(is2D) { for (const o of this.scatter.objects) if (o.userData.kind === 'grass' || o.userData.kind === 'flower') o.visible = !is2D; this.water.uniforms.uSimple.value = is2D || this.gfx.level !== 'high' ? 1 : 0; }
@@ -185,9 +209,11 @@ export class World {
     const indoor = focus.z > 200;
     this.group.visible = !indoor;
     if (!indoor) {
-      // Culling thông minh theo vùng: khi ở nông trại (x < 14), ẩn hoàn toàn cụm Làng (x = 36..68) tiết kiệm hàng chục draw call!
-      this.villageGroup.visible = mode2D || focus.x > 12;
-      this.beachGroup.visible = mode2D || focus.z > 14;
+      // Cắt vùng theo khung hình thật, tránh làng/biển biến mất khi xoay hoặc zoom camera.
+      camera.updateMatrixWorld();
+      this.viewFrustum.setFromProjectionMatrix(this.viewMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      this.villageGroup.visible = this.viewFrustum.intersectsBox(this.villageBounds);
+      this.beachGroup.visible = this.viewFrustum.intersectsBox(this.beachBounds);
       for (const k in this.penGroups) {
         const pg = this.penGroups[k], d2 = (focus.x - pg.cx) ** 2 + (focus.z - pg.cz) ** 2;
         const vis = mode2D || d2 < 38 * 38;
@@ -201,7 +227,7 @@ export class World {
     this.snowK += ((weather === 'snow' ? 1 : 0) - this.snowK) * Math.min(1, dt * 0.25); this.terrain.material.emissive.setRGB(0.55 * this.snowK, 0.58 * this.snowK, 0.64 * this.snowK); const u = this.water.uniforms; u.uTime.value = this.t; u.uCam.value.copy(camera.position);
     this.sky.update(dt, hour, weather, focus, camera.position, mode2D, indoor);
     u.uFogC.value.copy(this.scene.fog.color); u.uSky.value.copy(this.sky.domeMat.uniforms.uHor.value); u.uSun.value.copy(this.sky.sun.color); u.uFogN.value = this.scene.fog.near; u.uFogF.value = this.scene.fog.far;
-    if (!this.gfx.mobile) this.gfx.renderer.toneMappingExposure = this.sky.exposure;
+    this.gfx.renderer.toneMappingExposure = this.sky.exposure;
     // Đã bỏ khói ống khói & tia nước đài phun (hiệu ứng thừa gây giật)
   }
 }

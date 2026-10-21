@@ -68,7 +68,8 @@ export class FarmingSystem {
     const fortuneBonus = sim.st.daily?.fortune === 0 && sim.rng.chance(0.25);
     const qty = 1 + (team ? 1 : 0) + (lucky ? 1 : 0) + (fortuneBonus ? 1 : 0);
     sim.addItem(pid, cropId, qty); this.stat(pid, 'harvest');
-    if (def.regrow) { c.s = 'planted'; c.g = 0.45; } else { c.s = 'tilled'; delete c.crop; c.g = 0; delete c.fast; }
+    if (def.regrow) { c.s = 'planted'; c.g = 0.45; } else { c.s = 'tilled'; delete c.crop; c.g = 0; }
+    delete c.fast; // tốc độ hướng dẫn chỉ áp dụng vụ đầu, kể cả cây mọc lại
     c.by = [];
     sim.touch('crops.' + plot);
     sim.fx({ k: 'sfx', name: 'harvest', x: pos.x, z: pos.z });

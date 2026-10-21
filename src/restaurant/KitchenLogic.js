@@ -164,6 +164,13 @@ export class PlayerController {
     this.host.stationLogic.updateSinkWashing(chef, dt, isNearStationFn);
     this.host.crisisManager.updateOvensAndFires(chef, dt, isNearStationFn);
   }
+
+  // Shared equipment advances once per simulation frame, regardless of chef count.
+  updateKitchen(chefs, dt, isNearStationFn) {
+    this.host.stationLogic.updateChoppingBoards(chefs, dt, isNearStationFn);
+    this.host.stationLogic.updateSinkWashing(chefs, dt, isNearStationFn);
+    this.host.crisisManager.updateOvensAndFires(chefs, dt, isNearStationFn);
+  }
 }
 
 // ============================================================================
@@ -179,13 +186,15 @@ export class StationLogic {
    */
   handleCrateInteract(chef, station) {
     const dir = this.host.difficultyDirector;
+    const cutId = station.ing === 'tomato' ? 'tomato_cut' : station.ing === 'mozzarella' ? 'mozz_cut' : 'dough';
+    if (chef.hold?.items?.includes(cutId)) return false;
 
     // Check if Cheese Spawner is locked before Phase 3
     if (station.ing === 'mozzarella' && dir && !dir.cheeseSpawnerUnlocked) {
       this.host.addFloat?.(
         station.x + 20,
         station.y - 28,
-        '🔒 Phô Mai mở khoá ở PHASE 3 (120s) hoặc bấm [🚀 LÊN PHASE]!',
+        '🔒 Phô mai mở sau 120 giây hoặc khi đạt 650 xu.',
         '#ffca28'
       );
       this.host.g?.audio?.sfx?.('fail');
@@ -197,7 +206,7 @@ export class StationLogic {
       this.host.addFloat?.(
         station.x,
         station.y - 28,
-        '🔒 Đế Bánh Pizza mở khoá ở PHASE 3 (120s) hoặc bấm [🚀 LÊN PHASE]!',
+        '🔒 Đế pizza mở sau 120 giây hoặc khi đạt 650 xu.',
         '#ffca28'
       );
       this.host.g?.audio?.sfx?.('fail');
@@ -320,14 +329,16 @@ export class StationLogic {
    * Update 3.0-second Chopping Progress Bar when chef stands at/holds near an occupied board
    */
   updateChoppingBoards(chef, dt, isNearStationFn) {
+    const chefs = Array.isArray(chef) ? chef : [chef];
     for (let i = 0; i < this.host.boards.length; i++) {
       const b = this.host.boards[i];
       const st = this.host.getStation?.('board' + i);
       if (!b || !st || !b.ing || b.ready) continue;
 
       // Player must have empty hands (or combinable item) and stand near the board
-      const handsFreeForChop = !chef.hold || chef.hold.kind === 'item' || (chef.hold.kind === 'dish' && chef.hold.dish === 'tomato_salad');
-      if (handsFreeForChop && isNearStationFn(chef, st)) {
+      const worker = chefs.find((c) => c && (!c.hold || c.hold.kind === 'item' || (c.hold.kind === 'dish' && c.hold.dish === 'tomato_salad')) && isNearStationFn(c, st));
+      if (worker) {
+        const chef = worker;
         chef.chopT = Math.max(chef.chopT || 0, 0.2);
         b.prog = Math.min(1, b.prog + dt / KITCHEN_TIMINGS.CHOP_SECONDS);
         if (Math.random() < dt * 8) {
@@ -402,6 +413,7 @@ export class StationLogic {
    */
   handlePlateInteract(chef, station) {
     const p = this.host.plates[station.idx];
+    if (!p) return false;
     this.host.refillCounterPlates?.();
 
     if (!p.hasPlate && p.items.length === 0 && !p.dish) {
@@ -421,6 +433,7 @@ export class StationLogic {
       (chef.hold?.kind === 'dish' && (chef.hold.dish === 'tomato_salad' || chef.hold.dish === 'caprese'))
     ) {
       const heldList = chef.hold.items || [chef.hold.id];
+      if (!p.hasPlate || heldList.some((it) => !['tomato_cut', 'mozz_cut', 'dough'].includes(it))) return false;
       let added = false;
       for (const it of heldList) {
         if (it && !p.items.includes(it)) {
@@ -484,9 +497,12 @@ export class StationLogic {
 
     // Pick up partial items from plate
     if (p.items.length > 0 && !chef.hold) {
-      for (const it of p.items) this.host.tryAddHeldItem?.(chef, it);
+      // Transfer the existing plate with its ingredients; never borrow another plate.
+      chef.hold = { kind: 'item', id: p.items.at(-1), items: [...p.items], hasPlate: true };
+      p.hasPlate = false;
       p.items = [];
       p.dish = null;
+      this.host.refillCounterPlates?.();
       this.host.g?.audio?.sfx?.('pop');
       return true;
     }
@@ -524,14 +540,16 @@ export class StationLogic {
    * Update 2.0-second Washing Progress Bar when player stands at the Sink
    */
   updateSinkWashing(chef, dt, isNearStationFn) {
+    const chefs = Array.isArray(chef) ? chef : [chef];
     if (this.host.sink.dirtyCount <= 0) {
       this.host.sink.prog = 0;
       return;
     }
     const sinkSt = this.host.getStation?.('sink');
     const rackSt = this.host.getStation?.('dirtyRack');
-    const nearSink = (sinkSt && isNearStationFn(chef, sinkSt)) || (rackSt && isNearStationFn(chef, rackSt));
-    if (nearSink && (!chef.hold || chef.hold.kind === 'dirty')) {
+    const worker = chefs.find((c) => c && (!c.hold || c.hold.kind === 'dirty' || c.hold.kind === 'item') && ((sinkSt && isNearStationFn(c, sinkSt)) || (rackSt && isNearStationFn(c, rackSt))));
+    if (worker) {
+      const chef = worker;
       if (chef.hold?.kind === 'dirty') {
         this.host.sink.dirtyCount += chef.hold.count || 1;
         chef.hold = null;
@@ -642,12 +660,8 @@ export class StationLogic {
     // 3. Serve Dish on a Clean Plate
     if (tb.guest && (tb.guest.phase === 'ordered' || tb.guest.phase === 'wait_order') && chef.hold?.kind === 'dish') {
       const g = tb.guest;
-      // Check if dish matches customer order (or compatible salad upgrade)
-      const isCompatibleSalad =
-        (g.dish === 'tomato_salad' && chef.hold.dish === 'caprese') ||
-        (g.dish === 'caprese' && chef.hold.dish === 'tomato_salad');
       const exactMatch = chef.hold.dish === g.dish;
-      if (!exactMatch && !isCompatibleSalad) {
+      if (!exactMatch) {
         const wantName = KITCHEN_RECIPES[g.dish]?.name || g.dish;
         this.host.addFloat?.(tb.x, tb.y - 34, `⚠️ Bàn này gọi ${wantName}!`, '#ffca28');
         this.host.g?.audio?.sfx?.('fail');
@@ -669,6 +683,7 @@ export class StationLogic {
       g.eatT = 3.2;
 
       this.host.served++;
+      this.host.recordService?.(chef, tb.eatingDish);
       this.host.combo = exactMatch ? this.host.combo + 1 : 1;
       if (this.host.combo >= 3 && this.host.feverT <= 0) {
         this.host.feverT = 16;
@@ -772,7 +787,7 @@ export class CrisisManager {
       this.host.addFloat?.(
         station.x,
         station.y + 42,
-        '🔒 Lò Nướng mở ở PHASE 3 (120s) hoặc bấm [🚀 LÊN PHASE]!',
+        '🔒 Lò mở sau 120 giây hoặc khi đạt 650 xu.',
         '#ffca28'
       );
       this.host.g?.audio?.sfx?.('fail');
@@ -905,6 +920,7 @@ export class CrisisManager {
    * - Fire State: 'burning' with red smoke/fire particles; holding Fire Extinguisher for 3.0s -> 'burnt'
    */
   updateOvensAndFires(chef, dt, isNearStationFn) {
+    const chefs = Array.isArray(chef) ? chef : [chef];
     for (let i = 0; i < this.host.ovens.length; i++) {
       const ov = this.host.ovens[i];
       const st = this.host.getStation?.('oven' + i);
@@ -955,7 +971,9 @@ export class CrisisManager {
         }
 
         // Check if player is facing/near the burning oven while holding the Fire Extinguisher
-        if (st && chef.hold?.kind === 'extinguisher' && isNearStationFn(chef, st)) {
+        const worker = st && chefs.find((c) => c?.hold?.kind === 'extinguisher' && isNearStationFn(c, st));
+        if (worker) {
+          const chef = worker;
           ov.extinguishProg = Math.min(
             1,
             (ov.extinguishProg || 0) + dt / KITCHEN_TIMINGS.EXTINGUISH_SECONDS
@@ -1034,8 +1052,8 @@ export class DifficultyDirector {
     this.cheeseSpawnerUnlocked = false;
     this.bakingOvenUnlocked = false;
     this.announcementBanner = {
-      text: '🥗 PHASE 1 (0s-60s): EASY MODE — Món đơn giản 1 nguyên liệu (Cà Chua Thái)!',
-      subText: 'Tốc độ khách: 25s/đơn • Kiên nhẫn: Chậm • Phục vụ để mở thực đơn mới!',
+      text: '👨‍🍳 CA BẾP BẮT ĐẦU • 3 PHÚT GIÀNH 3 SAO',
+      subText: 'Chạm phiếu món để tìm bước tiếp theo • Thái → phục vụ → dọn → rửa',
       color: '#69f0ae',
       timer: 5.5,
     };
@@ -1049,7 +1067,14 @@ export class DifficultyDirector {
     this.elapsed += dt;
     if (this.elapsed >= this.matchDuration) {
       this.elapsed = this.matchDuration;
-      this.host.finishShift?.();
+      if (this.shiftsCompleted === 0) {
+        this.shiftsCompleted = 1;
+        if (this.host.finishShift) this.host.finishShift();
+        else {
+          this.host.matchOver = true;
+          this.host.rewardCoins?.(200, 640, 195, '🏆 Hoàn thành ca bếp +200 xu');
+        }
+      }
       return;
     }
 
@@ -1086,10 +1111,10 @@ export class DifficultyDirector {
     this.orderSpawnInterval = 12.0;
     this.patienceDecayMultiplier = 1.3;
     this.announcementBanner = {
-      text: '⚡ PHASE 2: RUSH HOUR! TỐC ĐỘ KHÁCH GẤP ĐÔI (12s/đơn)!',
+      text: '⚡ GIỜ CAO ĐIỂM! KHÁCH ĐÔNG HƠN',
       subText: byScore
-        ? 'Đạt mốc điểm sớm! Thanh kiên nhẫn của khách giảm nhanh hơn 30%!'
-        : '61s - 120s: Đơn hàng xuất hiện mỗi 12 giây • Kiên nhẫn giảm nhanh hơn 30%!',
+        ? 'Đạt 300 xu sớm! Khách mới mỗi 12 giây • Chia việc cùng nhau nhé!'
+        : 'Khách mới mỗi 12 giây • Ưu tiên phiếu có thanh thời gian màu đỏ',
       color: '#ffca28',
       timer: 6.0,
     };
@@ -1119,10 +1144,10 @@ export class DifficultyDirector {
     this.unlockedRecipes = ['tomato_salad', 'soda', 'caprese', 'pizza'];
 
     this.announcementBanner = {
-      text: '🎉 LEVEL UP! MỞ KHOÁ CÔNG THỨC MỚI: PIZZA ĐÚT LÒ!',
+      text: '🎉 MỞ THỰC ĐƠN CAPRESE & PIZZA',
       subText: byScore
-        ? 'Đạt mốc điểm xuất sắc! Đã bật Thùng Phô Mai 🧀 & Lò Nướng Gạch 🔥!'
-        : '121s - 180s: Đã mở Thùng Phô Mai 🧀 + Lò Nướng 🔥 + Thực đơn Pizza (Bột + Phô Mai + Cà Chua)!',
+        ? 'Đạt 650 xu sớm! Phô mai, đế pizza và hai lò đã sẵn sàng.'
+        : 'Pizza: đế + cà chua thái + phô mai thái → nướng 5 giây → phục vụ',
       color: '#ff6d00',
       timer: 7.5,
     };

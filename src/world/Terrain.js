@@ -33,7 +33,7 @@ export function pathAmt(x, z) {
   return a;
 }
 const C = (h) => new THREE.Color(h);
-const GRASS_A = C(0x8ed458), GRASS_B = C(0x68b842), GRASS_DARK = C(0x4e9c38), FOREST = C(0x3f8b3e), DIRT = C(0xdcb982), DIRT_EDGE = C(0xc49e68), COBBLE = C(0xe6d5b8), SAND = C(0xf4e3b2), WET = C(0xc5b07e), ROCK = C(0x9ea4ad), ROCK2 = C(0x848a94), SNOW = C(0xf6f9fd), UNDER = C(0x6fb098), MUD = C(0x825a38), STRAW = C(0xdfc87e), PEN = C(0x9cce66);
+const GRASS_A = C(0x9bc77a), GRASS_B = C(0x7daf62), GRASS_DARK = C(0x588d50), FOREST = C(0x477f48), DIRT = C(0xdcb982), DIRT_EDGE = C(0xc49e68), COBBLE = C(0xe6d5b8), SAND = C(0xf4e3b2), WET = C(0xc5b07e), ROCK = C(0x9ea4ad), ROCK2 = C(0x848a94), SNOW = C(0xf6f9fd), UNDER = C(0x6fb098), MUD = C(0x825a38), STRAW = C(0xdfc87e), PEN = C(0xa3bd7c);
 const tmp = new THREE.Color();
 const POND = PENS.duck.pond;
 const waterNear = (x, z) => Math.max(1 - smooth(5, 9, Math.abs(z - riverZ(x))), 1 - smooth(4, 7.5, Math.hypot(x - POND.x, z - POND.z)), smooth(54, 60, islandR(x, z)));

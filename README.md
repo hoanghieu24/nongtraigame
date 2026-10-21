@@ -8,9 +8,20 @@ Game nông trại **cozy + vui nhộn** cho **2–4 người**, chơi ngay trên
 npm install
 npm run dev        # http://localhost:3000  (mở được từ điện thoại cùng Wi-Fi: dùng địa chỉ Network)
 npm run build      # build ra dist/ — đưa lên bất kỳ hosting tĩnh nào (Netlify, GitHub Pages, itch.io...)
-npm test           # 33 test logic game (Node, không cần trình duyệt)
+npm test           # logic nông trại, bếp chơi chung, camera và tự cân bằng đồ hoạ
+npm run test:browser # cần npm run dev đang chạy và Chrome/Edge trên máy
 ```
 > PWA / cài lên màn hình chính điện thoại cần chạy qua **HTTPS** (hosting tĩnh đều có sẵn).
+
+Trên PowerShell chặn `npm.ps1`, dùng `npm.cmd test`, `npm.cmd run build` và `npm.cmd run dev`. Kiểm tra trình duyệt dùng hai tab với bản lưu tạm, giả lập điện thoại ngang/dọc; không ghi vào các nông trại đang lưu trên server. Có thể đặt `GAME_TEST_URL` để kiểm tra bản build qua `npm run preview`.
+
+## Bếp chơi chung
+
+Mở **Bếp chơi chung** từ menu hoặc nút **Quán**. Hai người trong cùng phòng vào chung một ca 3 phút, dùng chung khách, đơn, nguyên liệu, lò và bốn đĩa. Nhận đơn → lấy và thái nguyên liệu → ghép món → nướng pizza → phục vụ đúng bàn → dọn và rửa đĩa. Ca bắt đầu với salad và trà sữa, sau đó tăng lượng khách và mở thêm caprese/pizza. Kết quả ca và kỷ lục được lưu theo nông trại.
+
+Chạm phiếu đơn để tìm bước tiếp theo, chạm trạm để tự đi tới hoặc dùng WASD/cần điều khiển. Trên điện thoại có phiếu đơn và nút thao tác riêng với vùng bấm từ 44px. Chủ phòng chuyển tab thì ca bếp vẫn tiếp tục khi trình duyệt cho phép chạy nền; đóng game chủ phòng sẽ ngắt kết nối.
+
+Đồ hoạ tự cân bằng số pixel theo tốc độ máy. Cây có hình dáng riêng qua các giai đoạn lớn, góc nhìn cao hơn giúp thấy ruộng và vật nuôi rõ hơn. Chữ và phông tiếng Việt được đóng gói cùng game, không cần tải Google Fonts khi vào chơi.
 
 ## Chơi cùng người yêu / bạn bè
 1. Người chủ: **Tạo Farm** → hiện **mã phòng 6 ký tự** (xem lại trong ⚙️ Cài đặt).
@@ -24,7 +35,8 @@ npm test           # 33 test logic game (Node, không cần trình duyệt)
 | | PC | Điện thoại (chơi ngang) |
 |---|---|---|
 | Di chuyển | WASD / mũi tên | joystick bên trái |
-| Hành động bằng dụng cụ | Space | nút xanh **Hành động** |
+| Hành động bằng dụng cụ | F / C | nút xanh theo dụng cụ đang chọn |
+| Nhảy | Space | nút **Nhảy** |
 | Tương tác (thu hoạch, nói chuyện, vào nhà...) | E | nút cam theo ngữ cảnh |
 | Dụng cụ | 1–6 | thanh dụng cụ dưới màn hình |
 | Đổi góc nhìn 3D / **thứ nhất** / 2D | V | nút 🎥 |
@@ -42,7 +54,7 @@ Cuốc đất ⛏️ → gieo 🌱 → tưới 💧 → thu hoạch → **bán**
 
 ## Điện thoại (ưu tiên chơi bằng web trên điện thoại)
 - Tự nhận là điện thoại → **luôn hiển thị ngang**. Cầm dọc thì giao diện tự xoay 90° (xoay máy ngang là đọc thẳng). Android: bấm Chơi sẽ tự vào toàn màn hình + khoá ngang. iPhone: **Chia sẻ → Thêm vào Màn hình chính** để chơi toàn màn hình, không còn thanh Safari.
-- Joystick cố định có mũi tên (hoặc chạm bên trái màn hình để có joystick nổi). **Camera không xoay khi đi** (chỉ chụm 2 ngón để zoom); ở góc nhìn thứ nhất thì kéo ngón bên phải để nhìn quanh.
+- Joystick cố định có mũi tên (hoặc chạm bên trái màn hình để có joystick nổi). Kéo ngón bên phải để nhìn quanh, chụm hai ngón bên phải để zoom; ngón điều khiển di chuyển hoạt động độc lập.
 - Nút to (≥ 52px), dock có nhãn chữ, rung nhẹ khi bấm, thông báo nhỏ gọn ở dưới màn hình, không che HUD.
 - Đồ hoạ tự chọn theo máy, tự hạ mức nếu FPS thấp; mặt đất nâng độ nét dần ở nền.
 

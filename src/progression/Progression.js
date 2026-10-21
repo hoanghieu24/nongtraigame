@@ -8,11 +8,13 @@ export class ProgressionSystem {
   constructor(sim) { this.sim = sim; this.id = 'prog'; this.cmds = {}; }
   // XP cộng cho người chơi VÀ cho cả nông trại (cấp nông trại là của cả nhà)
   addXp(pid, amt) {
-    const { sim } = this, st = sim.st, p = st.players[pid]; if (!p || amt <= 0) return;
+    const { sim } = this, st = sim.st, p = st.players[pid]; if (!p || !Number.isFinite(amt) || amt <= 0) return;
     const pb = levelFromXp(p.xp); p.xp += amt; const pa = levelFromXp(p.xp);
     if (pa > pb) {
       p.level = pa;
-      const hat = HAT_REWARDS[pa]; if (hat && !p.hats.includes(hat)) { p.hats.push(hat); sim.toast(pid, `🎁 Nhận mũ mới: ${hat}!`, 'good'); }
+      for (const [level, hat] of Object.entries(HAT_REWARDS)) {
+        if (+level > pb && +level <= pa && !p.hats.includes(hat)) { p.hats.push(hat); sim.toast(pid, `🎁 Nhận mũ mới: ${hat}!`, 'good'); }
+      }
       sim.fx({ k: 'banner', to: pid, text: `Bạn lên Cấp ${pa}!`, sub: '⭐ Người chơi', tone: 'level' });
       sim.fx({ k: 'sfx', name: 'levelup', to: pid });
     }

@@ -203,6 +203,7 @@ input[type=text],input:not([type]),#chatIn{flex:1;min-width:0;border:2px solid #
 @keyframes wob{50%{transform:rotate(-1.5deg) scale(1.02)}}
 .mbtns{display:flex;flex-direction:column;gap:8px;width:min(360px,92%)}.mb{background:linear-gradient(180deg,#ffffff,#f7ead5);border-radius:18px;padding:9px 14px;font-size:17px;font-weight:800;border:2px solid #fff;box-shadow:0 4px 0 #d5bd98,var(--shadow);text-align:center;transition:transform .12s}.mb small{display:block;font-size:11.5px;color:var(--ink2);font-weight:700}.mb.primary{background:linear-gradient(180deg,#70db56,#47ad33);color:#fff;box-shadow:0 5px 0 #2e7a1e,var(--shadow);font-size:21px;border:2.5px solid rgba(255,255,255,.92);padding:10px 16px}.mb.primary small{color:#eaffdf}.mb.rscSpecial{background:linear-gradient(180deg,#ff9f43,#e66712);color:#fff;box-shadow:0 4px 0 #a84300,var(--shadow);border:2.5px solid #fff3d1;font-size:18px;padding:9px 14px}.mb.rscSpecial small{color:#fff5d6}.mb.ghost{background:rgba(255,255,255,.82)}.mb:active{transform:translateY(3px)}
 .mb.restaurantEntry{background:linear-gradient(135deg,#f59e0b,#ea580c)}
+.mb.arcadeEntry{background:#f8f1ff;border-color:#efe1fb;color:#6c4985}
 .menuHero{display:flex;flex-direction:column;align-items:center;gap:4px;width:min(490px,94%)}
 .mGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:2px}
 .mb.smBtn{font-size:14.5px;padding:8px 10px;border-radius:15px}
@@ -269,6 +270,13 @@ input[type=text],input:not([type]),#chatIn{flex:1;min-width:0;border:2px solid #
 .phone .mcard{max-height:96%}
 @media (max-height:370px){.phone #menu[data-screen="main"]{gap:6px 10px;padding-top:max(6px,var(--sat));padding-bottom:max(6px,var(--sab))}.phone #menu[data-screen="main"] .menuHero{gap:4px}.phone .title small{display:none}.phone .coupleBtn{padding:4px}.phone #menu[data-screen="main"] .mb{min-height:36px;padding:4px 6px}.phone #menu[data-screen="main"] .mb.primary{min-height:42px}.phone #menu[data-screen="main"] .mb.smBtn{min-height:34px}}
 .phone #menu.hidden{display:none}
+.phone #hudR [data-h="arcade"],.phone #hudR [data-h="daily"],.phone #hudR [data-h="snd"]{display:none}
+.phone #hudL .pill,.phone #hudR,.phone #hotbar{backdrop-filter:none}
+.phone .pulseBtn,.phone #dock u,.phone #hudR u,.phone .tl2{animation:none}
+.phone .ib{width:42px;height:42px}.phone .dk{min-width:44px;min-height:44px}
+.phone #dock{top:calc(var(--sat) + 49px)}
+.phone #guide{max-width:100%;white-space:normal;line-height:1.3}
+.phone .act2 small{white-space:normal;line-height:1.1;max-width:92px}
 .phone .slot{font-size:20px}
 .phone .chestRow{grid-template-columns:1fr}
 
@@ -309,12 +317,14 @@ input[type=text],input:not([type]),#chatIn{flex:1;min-width:0;border:2px solid #
 .rscPat u{display:block;height:100%;background:linear-gradient(90deg,#48bb78,#ecc94b,#f56565)}
 .rscWait{font-size:12.5px;color:#e6f6ff;padding:2px 6px}
 .station.prep{background:#e6f6ff;border:2px dashed #5ebee3}
+.kitchenLobby{display:flex;flex-direction:column;align-items:center;gap:8px;padding:14px 12px;background:#fffaf0;border:1px solid #e9d8bb;border-radius:18px;text-align:center}.kitchenLobby>b{font-size:21px;color:#74451e}.kitchenLobby p{margin:0;line-height:1.4;max-width:360px}.kitchenLobby ol{text-align:left;margin:3px 0;padding-left:22px;font-size:13px;line-height:1.6}.kitchenLobby .b{min-height:46px;width:min(100%,300px)}
 .station.burning,.station.burnt{background:#ffe1e1;border:2px solid #ef5350;animation:bob .4s infinite alternate}
 .phone .rscBar{bottom:calc(var(--sab) + 68px);max-width:calc(100% - 260px);padding:4px 8px}
 
 /* ================= MÀN HÌNH CHƠI 2.5D "READY, SET, COOK!" TOÀN MÀN HÌNH ================= */
 #rsc2d{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;z-index:28;background:#141d26;display:flex;align-items:center;justify-content:center;padding:0!important;overflow:hidden;touch-action:none}
 #rsc2dCanvas{width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:fill!important;border-radius:0!important;box-shadow:none!important;touch-action:none;cursor:pointer;display:block}
+.rscTouchUi{display:none}.phone .rscTouchUi{display:block;position:absolute;inset:0;pointer-events:none}.rscTouchUi button{pointer-events:auto;border:1.5px solid #ffe4b8;background:#293b47;color:#fff;border-radius:12px;box-shadow:0 2px 6px #0006;min-height:44px;touch-action:manipulation}.rscTouchMenu{position:absolute;left:calc(var(--sal) + 6px);top:calc(var(--sat) + 8px);display:grid;gap:6px}.rscTouchMenu button{width:46px;font-size:19px;line-height:1.05}.rscTouchMenu small{display:block;font-size:10px;color:#fff}.rscTouchAction{position:absolute;right:calc(var(--sar) + 7px);bottom:calc(var(--sab) + 9px);width:68px;min-height:64px!important;border-radius:20px!important;background:#388b48!important;font-size:24px;line-height:1.15}.rscTouchAction small{display:block;color:#fff;font-size:12px}.rscTouchOrders{position:absolute;top:calc(var(--sat) + 5px);left:50%;transform:translateX(-50%);display:flex;gap:4px;max-width:52%}.rscTouchOrders button{width:91px;min-width:0;padding:3px 5px;text-align:left;background:#fff7e6;color:#453321;border-color:#dfac54}.rscTouchOrders small{font-size:9px;display:block;color:#6c5637;line-height:1}.rscTouchOrders b{font-size:12px;white-space:nowrap;line-height:1.3;display:block}.rscTouchOrders i{display:block;height:4px;background:#e9dcc4;border-radius:3px;overflow:hidden}.rscTouchOrders u{display:block;height:100%;background:#47ad68;text-decoration:none}
 #app.rsc2d-open #hud,#app.rsc2d-open #joyFix,#app.rsc2d-open #joy,#app.rsc2d-open #marker,#app.rsc2d-open #crosshair,#app.rsc2d-open #cropTimers{display:none!important;pointer-events:none!important}
 
 /* ================= KHU VUI CHƠI ĐÔI & NÚT CHỌN HIẾU - HUYỀN ================= */

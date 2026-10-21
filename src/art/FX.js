@@ -19,7 +19,10 @@ const KINDS = {
 const VS = `attribute float aSize; attribute vec4 aCol; attribute float aType; uniform float uScale; uniform float uOrtho; varying vec4 vCol; varying float vType;
 void main(){ vCol=aCol; vType=aType; vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv; gl_PointSize = uOrtho>0.5 ? aSize*uScale : aSize*uScale/max(0.1,-mv.z); }`;
 const FS = `uniform sampler2D uMap; varying vec4 vCol; varying float vType;
-void main(){ vec2 tile=vec2(mod(vType,4.),floor(vType/4.)); vec2 uv=(tile+vec2(gl_PointCoord.x,1.-gl_PointCoord.y))/vec2(4.,2.); vec4 t=texture2D(uMap,uv); if(t.a*vCol.a<0.02) discard; gl_FragColor=vec4(vCol.rgb*t.rgb, t.a*vCol.a); }`;
+void main(){ vec2 tile=vec2(mod(vType,4.),floor(vType/4.)); vec2 uv=(tile+vec2(gl_PointCoord.x,1.-gl_PointCoord.y))/vec2(4.,2.); vec4 t=texture2D(uMap,uv); if(t.a*vCol.a<0.02) discard; gl_FragColor=vec4(vCol.rgb*t.rgb, t.a*vCol.a);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
 
 function atlas() {
   return canvasTex(256, 128, (ctx) => {
@@ -38,7 +41,7 @@ function atlas() {
 
 export class FX {
   constructor(scene, ui) {
-    this.scene = scene; this.ui = ui; this.max = 900; this.cap = 900; this.n = 0; this.head = 0;
+    this.scene = scene; this.ui = ui; this.max = 240; this.cap = 240; this.n = 0; this.head = 0;
     const N = this.max;
     this.pos = new Float32Array(N * 3); this.vel = new Float32Array(N * 3); this.life = new Float32Array(N); this.maxLife = new Float32Array(N);
     this.size0 = new Float32Array(N); this.grow = new Float32Array(N); this.g = new Float32Array(N); this.alpha = new Float32Array(N);
@@ -50,36 +53,40 @@ export class FX {
     this.aType = new THREE.BufferAttribute(new Float32Array(N), 1);
     geo.setAttribute('position', this.aPos); geo.setAttribute('aSize', this.aSize); geo.setAttribute('aCol', this.aCol); geo.setAttribute('aType', this.aType);
     this.mat = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, transparent: true, depthWrite: false, uniforms: { uMap: { value: atlas() }, uScale: { value: 500 }, uOrtho: { value: 0 } } });
-    this.points = new THREE.Points(geo, this.mat); this.points.frustumCulled = false; this.points.renderOrder = 10; scene.add(this.points);
-    this.shake = 0; this.floats = []; this._tmp = new THREE.Vector3();
+    geo.setDrawRange(0, this.cap);
+    this.points = new THREE.Points(geo, this.mat); this.points.visible = false; this.points.frustumCulled = false; this.points.renderOrder = 10; scene.add(this.points);
+    this.shake = 0; this.floats = []; this._tmp = new THREE.Vector3(); this._color = new THREE.Color();
   }
   setCap(n) {
     const cap = Math.max(1, Math.min(this.max, Math.floor(n) || 1));
     if (cap === this.cap) return;
     const oldCap = this.cap;
     this.cap = cap; this.head %= cap;
+    this.points.geometry.setDrawRange(0, cap);
     if (cap < oldCap) for (let i = cap; i < oldCap; i++) { this.life[i] = 0; this.aSize.array[i] = 0; }
     this.n = 0;
     for (let i = 0; i < cap; i++) if (this.life[i] > 0) this.n++;
     if (cap < oldCap) this.aSize.needsUpdate = true;
   }
   burst(kind, x, y, z, n = 8) {
-    const k = KINDS[kind] || KINDS.sparkle, r = (a, b) => a + Math.random() * (b - a), c = new THREE.Color();
-    n = Math.max(1, Math.round(n * (this.cap / this.max > 0.5 ? 1 : 0.5)));
+    const k = KINDS[kind] || KINDS.sparkle, r = (a, b) => a + Math.random() * (b - a), c = this._color;
+    n = Math.min(this.cap, Math.max(1, Math.round(n * (this.cap < 100 ? 0.6 : 1))));
     let changedType = false;
     for (let j = 0; j < n; j++) {
       const i = this.head; this.head = (this.head + 1) % this.cap; if (i >= this.cap) continue;
       if (this.life[i] <= 0 && this.aSize.array[i] === 0) this.n++;
       const a = Math.random() * 6.283, sp = r(0, k.spread);
-      this.pos.set([x + r(-0.15, 0.15), y, z + r(-0.15, 0.15)], i * 3);
-      this.vel.set([Math.cos(a) * sp, r(k.vy[0], k.vy[1]), Math.sin(a) * sp], i * 3);
+      const ix = i * 3;
+      this.pos[ix] = x + r(-0.15, 0.15); this.pos[ix + 1] = y; this.pos[ix + 2] = z + r(-0.15, 0.15);
+      this.vel[ix] = Math.cos(a) * sp; this.vel[ix + 1] = r(k.vy[0], k.vy[1]); this.vel[ix + 2] = Math.sin(a) * sp;
       this.maxLife[i] = this.life[i] = r(k.life[0], k.life[1]); this.size0[i] = r(k.size[0], k.size[1]); this.grow[i] = k.grow || 0; this.g[i] = k.g; this.alpha[i] = k.alpha || 1;
-      c.setHex(Math.random() < 0.5 ? k.col[0] : k.col[1]); this.c0.set([c.r, c.g, c.b], i * 3); this.aType.array[i] = k.t; changedType = true;
+      c.setHex(Math.random() < 0.5 ? k.col[0] : k.col[1]); this.c0[ix] = c.r; this.c0[ix + 1] = c.g; this.c0[ix + 2] = c.b; this.aType.array[i] = k.t; changedType = true;
     }
     if (changedType) this.aType.needsUpdate = true;
   }
   // chữ nổi (DOM) bay lên rồi mờ dần
   float(x, y, z, text, color = '#fff') {
+    if (this.floats.length >= 16) { const oldest = this.floats.shift(); this.ui.floatFree(oldest.el); }
     const el = this.ui.floatEl(); if (!el) return;
     el.textContent = text; el.style.color = color; el.style.display = 'block';
     this.floats.push({ el, p: new THREE.Vector3(x, y, z), t: 0, life: 1.5 });
@@ -105,6 +112,7 @@ export class FX {
       if (camera.isOrthographicCamera) { this.mat.uniforms.uOrtho.value = 1; this.mat.uniforms.uScale.value = h / (camera.top - camera.bottom); }
       else { this.mat.uniforms.uOrtho.value = 0; this.mat.uniforms.uScale.value = h / (2 * Math.tan((camera.fov * Math.PI) / 360)); }
     }
+    this.points.visible = this.n > 0;
     // chữ nổi
     for (let i = this.floats.length - 1; i >= 0; i--) {
       const f = this.floats[i]; f.t += dt; const k = f.t / f.life;

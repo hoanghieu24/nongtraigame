@@ -24,7 +24,8 @@ const carryIconOf = (carry) => {
 export class PlayerView {
   constructor(ctx) { this.ctx = ctx; this.group = new THREE.Group(); ctx.scene.add(this.group); this.rigs = new Map(); this.bubbles = new Map();
     this.lineGeo = new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(6 * 3), 3)); this.lines = new Map(); }
-  say(pid, text) { const r = this.rigs.get(pid); if (!r) return; if (r.bubble) r.head.remove(r.bubble); r.bubble = spriteOf(bubbleTexture(text), 3.4, 1.13); r.bubble.position.y = 1.6; r.head.add(r.bubble); r.bubbleT = 4.5; }
+  clearBubble(rig) { if (rig.bubble) { rig.bubble.removeFromParent(); rig.bubble.material.map.dispose(); rig.bubble.material.dispose(); rig.bubble = null; } }
+  say(pid, text) { const r = this.rigs.get(pid); if (!r) return; this.clearBubble(r); r.bubble = spriteOf(bubbleTexture(text), 3.4, 1.13); r.bubble.position.y = 1.6; r.head.add(r.bubble); r.bubbleT = 4.5; }
   make(p) {
     const preset = PRESETS[p.char.preset % PRESETS.length], rig = buildCharacter({ skin: preset.skin, hair: preset.hair, eyes: preset.eyes, style: preset.style, outfit: preset.outfit, hat: p.char.hat }); rig.pid = p.id; rig.vx = 0; rig.vz = 0; rig.vr = 0; rig.init = false; rig.glass = false;
     rig.tag = spriteOf(nameTexture(p.name, PLAYER_COLORS[p.slot % 4]), 2.6, 0.65); rig.tag.position.y = 3.15; rig.root.add(rig.tag); rig.tagName = p.name; this.group.add(rig.root); return rig;
@@ -33,13 +34,13 @@ export class PlayerView {
     const seen = new Set();
     for (const pid in st.players) {
       const p = st.players[pid], pose = poses[pid]; if (!p.connected || !pose) continue; seen.add(pid); let rig = this.rigs.get(pid);
-      if (rig && (rig.preset !== p.char.preset)) { this.group.remove(rig.root); this.rigs.delete(pid); rig = null; }
+      if (rig && (rig.preset !== p.char.preset)) { this.removeRig(rig); this.rigs.delete(pid); rig = null; }
       if (!rig) { rig = this.make(p); rig.preset = p.char.preset; this.rigs.set(pid, rig); }
-      if (rig.tagName !== p.name) { rig.tag.material.map = nameTexture(p.name, PLAYER_COLORS[p.slot % 4]); rig.tagName = p.name; }
+      if (rig.tagName !== p.name) { rig.tag.material.map.dispose(); rig.tag.material.map = nameTexture(p.name, PLAYER_COLORS[p.slot % 4]); rig.tagName = p.name; }
       rig.setHat(p.char.hat);
       const local = pid === localId, far = !rig.init || Math.hypot(pose.x - rig.vx, pose.z - rig.vz) > 8;
       rig.vx = local || far ? pose.x : damp(rig.vx, pose.x, 16, dt); rig.vz = local || far ? pose.z : damp(rig.vz, pose.z, 16, dt); rig.vr = local || far ? pose.rot : dampAngle(rig.vr, pose.rot, 14, dt); rig.init = true;
-      rig.root.visible = (pose.area || 'out') === localArea && !(this.hideLocal && local); if (!rig.root.visible) continue;
+      rig.root.visible = (pose.area || 'out') === localArea && !(this.hideLocal && local); if (!rig.root.visible) { this.fishLine(pid, p, rig, t); continue; }
       const gY = yAt(rig.vx, rig.vz), curY = pose.y ?? gY, airY = Math.max(0, curY - gY);
       rig.root.position.set(rig.vx, curY, rig.vz); rig.root.rotation.y = rig.vr;
       const tool = TOOLS[pose.tool ?? 0]; setTool(rig, p.carry ? 'none' : p.fishing ? 'rod' : tool, p.weapon);
@@ -49,16 +50,21 @@ export class PlayerView {
       // Hiển thị icon nguyên liệu / món ăn người chơi đang bưng trên tay
       const cIc = carryIconOf(p.carry);
       if (rig.carryIconKey !== cIc) {
-        if (rig.carrySp) { rig.carry.remove(rig.carrySp); rig.carrySp = null; }
+        if (rig.carrySp) { rig.carry.remove(rig.carrySp); rig.carrySp.material.dispose(); rig.carrySp = null; }
         rig.carryIconKey = cIc;
         if (cIc) { rig.carrySp = iconSprite(cIc, 0.85); rig.carrySp.position.set(0, 0.55, 0); rig.carry.add(rig.carrySp); }
       }
-      if (rig.bubble && (rig.bubbleT -= dt) <= 0) { rig.head.remove(rig.bubble); rig.bubble = null; }
+      if (rig.bubble && (rig.bubbleT -= dt) <= 0) this.clearBubble(rig);
       this.fishLine(pid, p, rig, t);
     }
-    for (const [pid, rig] of this.rigs) if (!seen.has(pid)) { this.group.remove(rig.root); this.rigs.delete(pid); this.removeLine(pid); }
+    for (const [pid, rig] of this.rigs) if (!seen.has(pid)) { this.removeRig(rig); this.rigs.delete(pid); this.removeLine(pid); }
   }
-  removeLine(pid) { const l = this.lines.get(pid); if (l) { this.group.remove(l.line, l.bob); this.lines.delete(pid); } }
+  removeRig(rig) {
+    this.clearBubble(rig); rig.tag.material.map.dispose(); rig.tag.material.dispose();
+    rig.carrySp?.material.dispose();
+    this.group.remove(rig.root);
+  }
+  removeLine(pid) { const l = this.lines.get(pid); if (l) { this.group.remove(l.line, l.bob); l.line.geometry.dispose(); l.line.material.dispose(); l.bob.geometry.dispose(); l.bob.material.dispose(); this.lines.delete(pid); } }
   fishLine(pid, p, rig, t) {
     const f = p.fishing; let l = this.lines.get(pid);
     if (!f || !rig.root.visible) { if (l) { l.line.visible = false; l.bob.visible = false; } return; }

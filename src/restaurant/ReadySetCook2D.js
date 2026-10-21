@@ -1,5 +1,4 @@
-// Màn chơi 2D "Ready, Set, Cook!" chuẩn Pizzeria của Coatsink (https://unity.com/vn/resources/coatsink-ready-set-cook)
-// Bản v15.0.0 - Đồ hoạ 2.5D Diorama Chibi Sắc Nét Chuẩn Bản Gốc & Tối Ưu Cảm Ứng Điện Thoại 100%:
+// Bếp hợp tác 2D: chuẩn bị nguyên liệu, nấu, phục vụ và rửa bát trong một ca chung.
 // - Chỉ có duy nhất nhân vật người chơi (YOU - mặc đồ khủng long cam có đuôi, không có bot) tự vận hành quán.
 // - Tương thích tuyệt đối trên Điện Thoại (kể cả khi xoay ngang 90° bằng Viewport.js VP.rot):
 //   + Không kéo giãn/méo hình trên màn hình điện thoại dài (20:9, 19.5:9) nhờ hệ quy chiếu đồng nhất (viewScale, viewOffsetX, viewOffsetY).
@@ -402,7 +401,8 @@ export class ReadySetCook2D {
     if (!this.canvas) return;
     const vw = VP?.vw || (typeof window !== 'undefined' ? window.innerWidth : W) || W;
     const vh = VP?.vh || (typeof window !== 'undefined' ? window.innerHeight : H) || H;
-    const dpr = Math.min((typeof window !== 'undefined' ? window.devicePixelRatio : 2) || 2, 2.5);
+    const mobile = this.g?.input?.mobile;
+    const dpr = Math.min((typeof window !== 'undefined' ? window.devicePixelRatio : 2) || 2, mobile ? 1.5 : 2, Math.sqrt(2000000 / Math.max(1, vw * vh)));
     const scale = Math.min(vw / W, vh / H);
     this.viewScale = scale;
     this.viewOffsetX = (vw - W * scale) * 0.5;
@@ -437,8 +437,26 @@ export class ReadySetCook2D {
       wrap.className = 'rsc2d hidden';
       document.getElementById('app').appendChild(wrap);
     }
-    wrap.innerHTML = `<canvas id="rsc2dCanvas"></canvas>`;
+    wrap.innerHTML = `<canvas id="rsc2dCanvas"></canvas><div class="rscTouchUi"><div class="rscTouchMenu"><button data-kitchen="exit" aria-label="Ra sân">←<small>Ra sân</small></button><button data-kitchen="labels" aria-label="Hiện tên trạm bếp">☷<small>Nhãn</small></button></div><div class="rscTouchOrders"></div><button class="rscTouchAction" data-kitchen="action">⚡<small>Thao tác</small></button></div>`;
     this.wrap = wrap;
+    wrap.querySelector('.rscTouchUi').addEventListener('pointerdown', (e) => e.stopPropagation());
+    wrap.querySelector('.rscTouchUi').addEventListener('click', (e) => {
+      const button = e.target.closest('[data-kitchen]');
+      if (!button || !this.active) return;
+      e.preventDefault(); e.stopPropagation();
+      switch (button.dataset.kitchen) {
+        case 'exit': this.close(); break;
+        case 'labels': this.showTip = !this.showTip; break;
+        case 'action': this.onCanvasTap(this.matchOver ? 530 : ACT_BTN.x, this.matchOver ? 480 : ACT_BTN.y); break;
+        case 'order': {
+          const guest = this.guests.find((g) => g.id === button.dataset.guest);
+          if (guest) this.autoSmartStep(this.myChef, guest.dish, this.tables[guest.tableId]);
+          break;
+        }
+      }
+    });
+    this.touchOrdersEl = wrap.querySelector('.rscTouchOrders');
+    this.touchActionLabel = wrap.querySelector('.rscTouchAction small');
     this.canvas = wrap.querySelector('#rsc2dCanvas');
     this.ctx = this.canvas.getContext('2d', { alpha: false });
     this.syncHiDpi();
@@ -539,6 +557,12 @@ export class ReadySetCook2D {
   }
 
   resetState() {
+    this.shiftId = `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
+    this.hasHostState = this.isHost;
+    this.netSyncT = 0;
+    this.netSendT = 0;
+    this.lastClientAction = null;
+    this.previousBest = this.g.store?.state?.restaurant?.arcade?.bestScore || 0;
     this.difficultyDirector?.reset();
     this.timer = KITCHEN_TIMINGS.MATCH_SECONDS; // 180 giây chuẩn 3 Phase
     this.matchOver = false;
@@ -608,7 +632,8 @@ export class ReadySetCook2D {
     return this.chefs?.[this.myChefIndex] || this.chefs?.[0];
   }
 
-  setupChefs() {
+  setupChefs({ preserve = false } = {}) {
+    const previous = preserve ? this.chefs : null;
     const st = this.g?.store?.state;
     const players = Object.values(st?.players || {}).filter((p) => p.connected);
     const isClient = this.g?.session?.role === 'client';
@@ -622,7 +647,8 @@ export class ReadySetCook2D {
     this.chefs = [
       {
         id: pHost.id || 'hieu',
-        name: hostName.includes('Huyền') ? 'Huyền 💖' : 'Hiếu 💙',
+        name: hostName,
+        present: true,
         tagColor: hostName.includes('Huyền') ? '#f472b6' : '#38bdf8',
         costume: hostName.includes('Huyền') ? 'huyen' : 'hieu',
         x: 520,
@@ -638,7 +664,8 @@ export class ReadySetCook2D {
       },
       {
         id: pGuest.id || 'huyen',
-        name: guestName.includes('Hiếu') ? 'Hiếu 💙' : 'Huyền 💖',
+        name: guestName,
+        present: isClient,
         tagColor: guestName.includes('Hiếu') ? '#38bdf8' : '#f472b6',
         costume: guestName.includes('Hiếu') ? 'hieu' : 'huyen',
         x: 620,
@@ -654,12 +681,20 @@ export class ReadySetCook2D {
       },
     ];
 
+    if (previous) {
+      for (let i = 0; i < this.chefs.length; i++) {
+        const c = this.chefs[i], old = previous[i];
+        if (!old) continue;
+        for (const key of ['x', 'y', 'vx', 'vy', 'dir', 'hold', 'target', 'path', 'chopT', 'stepDustT', 'present']) c[key] = old[key];
+      }
+    }
+
     this.myChefIndex = isClient ? 1 : 0;
   }
 
   // Tổng số bát/đĩa sạch hiện đang sẵn sàng sử dụng (trên 2 quầy ghép + trên kệ bát sạch)
   getTotalCleanPlates() {
-    return (this.plates[0]?.hasPlate ? 1 : 0) + (this.plates[1]?.hasPlate ? 1 : 0) + (this.cleanPlateStack || 0);
+    return this.plates.reduce((n, p) => n + (p.hasPlate && p.items.length === 0 && !p.dish ? 1 : 0), this.cleanPlateStack || 0);
   }
 
   // Tự động lấy bát sạch từ kệ đặt bù lên 2 quầy ghép nếu quầy đang trống
@@ -674,7 +709,7 @@ export class ReadySetCook2D {
 
   // Lấy 1 bát sạch từ hệ thống 4 bát để đựng món ăn
   consumeOneCleanPlate(preferIdx = -1) {
-    if (preferIdx >= 0 && this.plates[preferIdx]?.hasPlate) {
+    if (preferIdx >= 0 && this.plates[preferIdx]?.hasPlate && !this.plates[preferIdx].items.length && !this.plates[preferIdx].dish) {
       this.plates[preferIdx].hasPlate = false;
       this.refillCounterPlates();
       return true;
@@ -760,7 +795,7 @@ export class ReadySetCook2D {
   open({ announce = true } = {}) {
     if (this.active) return;
     this.active = true;
-    this.setupChefs();
+    this.setupChefs({ preserve: true });
     this.g.input?.resetTouch?.();
     document.getElementById('app')?.classList.add('rsc2d-open');
     this.syncHiDpi();
@@ -769,7 +804,7 @@ export class ReadySetCook2D {
     this.g.session.send({ type: 'rest.shift', on: true, silent: true });
     this.g.audio.sfx('bell');
 
-    if (announce && this.g.session && this.g.session.role !== 'none') {
+    if ((announce || !this.isHost) && this.g.session && this.g.session.role !== 'none') {
       if (this.isHost) {
         this.g.session.sendRsc({ kind: 'host_opened', hostName: this.chefs[0]?.name });
       } else {
@@ -804,20 +839,34 @@ export class ReadySetCook2D {
   }
 
   finishShift() {
-    if (this.matchOver) return;
+    if (!this.isHost || this.matchOver) return;
     this.matchOver = true;
     this.timer = 0;
-    this.rewardCoins(200, 640, 195, '🏆 Hết ca! Thưởng hoàn thành +200 🪙');
+    if (this.served > 0) this.rewardCoins(200, 640, 195, '🏆 Hoàn thành ca bếp +200 xu');
+    const sim = this.g?.session?.sim || this.g?.sim;
+    if (sim?.st.restaurant) {
+      const r = sim.st.restaurant;
+      r.arcade ||= { bestScore: 0, bestStars: 0, shifts: 0, served: 0 };
+      r.arcade.bestScore = Math.max(r.arcade.bestScore, this.earned);
+      r.arcade.bestStars = Math.max(r.arcade.bestStars, this.starsReached);
+      r.arcade.shifts++;
+      r.arcade.served += this.served;
+      sim.touch('restaurant');
+    }
     this.g.audio.sfx('levelup');
     if (this.isHost) this.broadcastState();
   }
 
   restartShift() {
+    if (!this.isHost) return;
+    const present = this.chefs?.map((c) => c.present);
     this.resetState();
+    if (present) this.chefs.forEach((c, i) => { c.present = present[i]; });
     this.broadcastState();
   }
 
   addFloat(x, y, text, color = '#ffe066') {
+    if (this.floats.length >= 8) this.floats.shift();
     this.floats.push({ x, y, text, color, life: 1.6, maxLife: 1.6 });
     if (this.isHost && this.g?.session?.role === 'host') {
       this.g.session.sendRsc({ kind: 'float', x, y, text, color });
@@ -826,6 +875,8 @@ export class ReadySetCook2D {
 
   getSyncState() {
     return {
+      shiftId: this.shiftId,
+      previousBest: this.previousBest,
       timer: this.timer,
       earned: this.earned,
       served: this.served,
@@ -836,6 +887,7 @@ export class ReadySetCook2D {
       helperOn: this.helperOn,
       director: {
         elapsed: this.difficultyDirector?.elapsed || 0,
+        shiftsCompleted: this.difficultyDirector?.shiftsCompleted || 0,
         phase: this.difficultyDirector?.phase || 1,
         orderSpawnInterval: this.difficultyDirector?.orderSpawnInterval || 25,
         patienceDecayMultiplier: this.difficultyDirector?.patienceDecayMultiplier || 1,
@@ -861,6 +913,10 @@ export class ReadySetCook2D {
               id: t.guest.id,
               kind: t.guest.kind,
               styleIdx: t.guest.styleIdx,
+              style: t.guest.style,
+              tableId: t.guest.tableId,
+              eatT: t.guest.eatT,
+              animT: t.guest.animT,
               dish: t.guest.dish,
               phase: t.guest.phase,
               patience: t.guest.patience,
@@ -874,6 +930,9 @@ export class ReadySetCook2D {
           id: g.id,
           kind: g.kind,
           styleIdx: g.styleIdx,
+          style: g.style,
+          eatT: g.eatT,
+          animT: g.animT,
           dish: g.dish,
           phase: g.phase,
           patience: g.patience,
@@ -885,6 +944,7 @@ export class ReadySetCook2D {
           targetTable: g.targetTable,
         })),
       chef0: {
+        present: this.chefs[0]?.present !== false,
         x: Math.round(this.chefs[0]?.x || 520),
         y: Math.round(this.chefs[0]?.y || 525),
         vx: Math.round(this.chefs[0]?.vx || 0),
@@ -894,6 +954,7 @@ export class ReadySetCook2D {
         chopT: this.chefs[0]?.chopT || 0,
       },
       chef1: {
+        present: !!this.chefs[1]?.present,
         x: Math.round(this.chefs[1]?.x || 620),
         y: Math.round(this.chefs[1]?.y || 525),
         vx: Math.round(this.chefs[1]?.vx || 0),
@@ -907,6 +968,17 @@ export class ReadySetCook2D {
 
   applySyncState(st) {
     if (!st) return;
+    const newShift = !this.hasHostState || st.shiftId !== this.shiftId;
+    this.shiftId = st.shiftId;
+    this.hasHostState = true;
+    this.previousBest = st.previousBest || 0;
+    if (newShift && this.myChef) {
+      this.myChef.target = null;
+      this.myChef.path = [];
+      this.floats.length = 0;
+      this.particles.length = 0;
+      this.lastClientAction = null;
+    }
     this.timer = st.timer;
     this.earned = st.earned;
     this.served = st.served;
@@ -950,6 +1022,9 @@ export class ReadySetCook2D {
         const existing = this.guests.find((g) => g.id === sg.id);
         return existing ? Object.assign(existing, sg) : { ...sg };
       });
+      for (const table of this.tables) {
+        table.guest = table.guest ? this.guests.find((g) => g.id === table.guest.id) || null : null;
+      }
     }
 
     if (st.chef0 && this.chefs[0]) {
@@ -960,10 +1035,14 @@ export class ReadySetCook2D {
       this.chefs[0].dir = st.chef0.dir;
       this.chefs[0].hold = st.chef0.hold;
       this.chefs[0].chopT = st.chef0.chopT;
+      this.chefs[0].present = st.chef0.present !== false;
     }
 
     if (st.chef1 && this.chefs[1]) {
-      Object.assign(this.chefs[1], st.chef1);
+      // The client predicts its own position. Old snapshots must not pull it back.
+      const { x, y, vx, vy, dir, ...gameplay } = st.chef1;
+      Object.assign(this.chefs[1], gameplay);
+      if (newShift) Object.assign(this.chefs[1], { x, y, vx, vy, dir });
     } else if (st.chef1Hold !== undefined && this.chefs[1]) {
       this.chefs[1].hold = st.chef1Hold;
     }
@@ -984,20 +1063,18 @@ export class ReadySetCook2D {
     } else if (msg.kind === 'client_join') {
       if (this.isHost) {
         if (!this.active) this.open({ announce: false });
+        this.setupChefs({ preserve: true });
+        this.chefs[1].present = true;
         this.addFloat(640, 220, `💖 ${msg.clientName || 'Huyền'} đã vào Bếp! Cùng nấu ăn nào!`, '#ff80ab');
         this.broadcastState();
       }
     } else if (msg.kind === 'client_move') {
-      if (this.isHost && this.chefs[1]) {
-        this.chefs[1].x = msg.x;
-        this.chefs[1].y = msg.y;
-        this.chefs[1].vx = msg.vx;
-        this.chefs[1].vy = msg.vy;
-        this.chefs[1].dir = msg.dir;
-        this.chefs[1].chopT = msg.chopT;
+      if (this.isHost && this.chefs[1]?.present && sender === this.chefs[1].id && [msg.x, msg.y, msg.vx, msg.vy, msg.dir].every(Number.isFinite)) {
+        Object.assign(this.chefs[1], { x: msg.x, y: msg.y, vx: msg.vx, vy: msg.vy, dir: msg.dir });
+        this.resolveCollisions(this.chefs[1]);
       }
     } else if (msg.kind === 'client_act') {
-      if (this.isHost && this.chefs[1]) {
+      if (this.isHost && !this.matchOver && this.chefs[1]?.present && sender === this.chefs[1].id) {
         const st = STATIONS[msg.stationId];
         const tb = this.tables.find((t) => t.id === msg.tableId);
         this.interactAt(this.chefs[1], st, tb);
@@ -1007,7 +1084,7 @@ export class ReadySetCook2D {
     } else if (msg.kind === 'result_action') {
       if (this.isHost && msg.action === 'restart' && this.matchOver) this.restartShift();
     } else if (msg.kind === 'client_tap') {
-      if (this.isHost && this.chefs[1]) {
+      if (this.isHost && !this.matchOver && this.chefs[1]?.present && sender === this.chefs[1].id && Number.isFinite(msg.tx) && Number.isFinite(msg.ty)) {
         const st = STATIONS[msg.stationId];
         const tb = this.tables.find((t) => t.id === msg.tableId);
         this.setChefDestination(this.chefs[1], msg.tx, msg.ty, st, tb);
@@ -1017,17 +1094,28 @@ export class ReadySetCook2D {
         this.applySyncState(msg.state);
       }
     } else if (msg.kind === 'float') {
-      this.floats.push({ x: msg.x, y: msg.y, text: msg.text, color: msg.color, life: 1.6, maxLife: 1.6 });
+      if (!this.isHost) this.addFloat(msg.x, msg.y, msg.text, msg.color);
     } else if (msg.kind === 'host_closed' && !this.isHost) {
       this.close({ announce: false });
     } else if (msg.kind === 'chef_leave') {
       const idx = msg.chefIndex;
       const chef = this.chefs?.[idx];
+      if (this.isHost && idx === 1 && chef) {
+        const held = chef.hold?.kind === 'extinguisher' ? chef.hold.prevHold : chef.hold;
+        if (held?.hasPlate) this.sink.dirtyCount++;
+        if (held?.kind === 'dirty') this.sink.dirtyCount += held.count || 1;
+        chef.hold = null;
+        chef.present = false;
+        chef.vx = chef.vy = 0;
+        chef.path = [];
+        chef.target = null;
+      }
       this.addFloat(640, 220, `👋 ${chef?.name || 'Đầu bếp'} đã tạm ra ngoài`, '#ffd54f');
     }
   }
 
   spawnParticles(x, y, kind, count = 6) {
+    count = Math.min(count, Math.max(0, (VP.phone ? 70 : 130) - this.particles.length));
     for (let i = 0; i < count; i++) {
       const ang = Math.random() * Math.PI * 2;
       const spd = 28 + Math.random() * 65;
@@ -1064,8 +1152,8 @@ export class ReadySetCook2D {
       x: DOOR_POS.x,
       y: DOOR_POS.y,
       path,
-      patience: 78,
-      maxPatience: 78,
+      patience: dish === 'pizza' ? 100 : dish === 'caprese' ? 90 : 78,
+      maxPatience: dish === 'pizza' ? 100 : dish === 'caprese' ? 90 : 78,
       eatT: 0,
       animT: Math.random() * 10,
     };
@@ -1137,12 +1225,12 @@ export class ReadySetCook2D {
       } else {
         this.helperOn = next;
       }
-      this.addFloat(640, 125, this.helperOn ? '🐱 Mimi sẽ tự nhận đơn mới giúp hai đầu bếp!' : '🐱 Mimi đã tạm nghỉ', '#ffe066');
+      this.addFloat(640, 125, next ? '🐱 Mimi sẽ tự nhận đơn mới' : '🐱 Mimi đã tạm nghỉ', '#ffe066');
       return;
     }
     // 3b. Chạm vào Phiếu Order (Order Tickets) ở thanh trên cùng -> Tự động làm ngay món trên phiếu đó!
     if (sy >= 12 && sy <= 96 && sx >= 435 && sx <= 772) {
-      const orderedGuests = this.guests.filter((g) => g.phase === 'wait_order' || g.phase === 'ordered');
+      const orderedGuests = this.getOrderQueue();
       const idx = Math.floor((sx - 440) / 110);
       const targetGuest = orderedGuests[idx] || orderedGuests[0];
       if (targetGuest) {
@@ -1199,6 +1287,12 @@ export class ReadySetCook2D {
 
   // Nút ⚡ THAO TÁC hoặc chạm Phiếu Order: tự động dẫn nhân vật YOU tới bước hợp lý tiếp theo!
   autoSmartStep(c, preferDish = null, preferTable = null) {
+    if (preferTable?.guest?.phase === 'ordered') c.orderTableId = preferTable.id;
+    const assigned = this.tables.find((t) => t.id === c.orderTableId && t.guest?.phase === 'ordered');
+    if (!preferTable && assigned) {
+      preferTable = assigned;
+      preferDish = assigned.guest.dish;
+    }
     // 0. Nếu đang cầm Đồ Cháy Đen ('burnt_food') -> Bắt buộc đem vứt vào Thùng Rác trước!
     if (c.hold?.kind === 'burnt_food') {
       this.setChefDestination(c, STATIONS.trash.standX, STATIONS.trash.standY, STATIONS.trash, null);
@@ -1257,24 +1351,25 @@ export class ReadySetCook2D {
     // 5. Đang bưng món ăn hoàn chỉnh -> Kiểm tra nếu khách cần món đó thì đem ra bàn khách!
     if (c.hold?.kind === 'dish') {
       const matchingTb =
-        this.tables.find((t) => t.guest && t.guest.dish === c.hold.dish) ||
-        (preferTable?.guest?.dish === c.hold.dish ? preferTable : null);
+        (preferTable?.guest?.phase === 'ordered' && preferTable.guest.dish === c.hold.dish ? preferTable : null) ||
+        this.tables.find((t) => t.guest?.phase === 'ordered' && t.guest.dish === c.hold.dish);
       if (matchingTb) {
         this.setChefDestination(c, matchingTb.standX, matchingTb.standY, null, matchingTb);
         return;
       }
       // Nếu đang cầm tomato_salad mà khách gọi caprese hoặc pizza (ở Phase 3), tiếp tục lấy thêm Phô mai!
-      if (c.hold.dish !== 'tomato_salad') {
-        const anyGuestTb = preferTable || this.tables.find((t) => t.guest);
-        if (anyGuestTb) {
-          this.setChefDestination(c, anyGuestTb.standX, anyGuestTb.standY, null, anyGuestTb);
-          return;
-        }
+      if (c.hold.dish === 'soda' || c.hold.dish === 'pizza') {
+        this.addFloat(c.x, c.y - 42, 'Chưa có khách gọi món này. Chờ đơn mới nhé!', '#ffe082');
+        return;
       }
     }
     // 6. Đang cầm Pizza sống -> Đem đút Lò Gạch nướng 5.0s!
     if (c.hold?.kind === 'raw_pizza') {
-      const ovIdx = Math.max(0, this.ovens.findIndex((o) => o.state === 'idle'));
+      const ovIdx = this.ovens.findIndex((o) => o.state === 'idle');
+      if (ovIdx < 0) {
+        this.addFloat(c.x, c.y - 42, 'Hai lò đang bận, chờ bánh chín nhé!', '#ffe082');
+        return;
+      }
       const st = STATIONS['oven' + ovIdx];
       this.setChefDestination(c, st.standX, st.standY, st, null);
       return;
@@ -1300,13 +1395,13 @@ export class ReadySetCook2D {
       return;
     }
     // 10. Khách gọi Trà Sữa Trân Châu -> Tới Máy Trà Sữa để rót (2.5s) hoặc lấy ly đã rót xong!
-    const wantSoda = preferDish === 'soda' || (!c.hold && this.tables.some((t) => t.guest?.dish === 'soda'));
+    const wantSoda = preferDish === 'soda' || (!preferDish && !c.hold && this.tables.some((t) => t.guest?.phase === 'ordered' && t.guest.dish === 'soda'));
     if (wantSoda && !c.hold) {
       this.setChefDestination(c, STATIONS.drink.standX, STATIONS.drink.standY, STATIONS.drink, null);
       return;
     }
     // 11. Có bát bẩn trong bồn rửa hoặc trên bàn -> Đi dọn và rửa (2.0s)!
-    if (this.sink.dirtyCount > 0 && !c.hold) {
+    if (this.sink.dirtyCount > 0 && (!c.hold || c.hold.kind === 'item')) {
       this.setChefDestination(c, STATIONS.sink.standX, STATIONS.sink.standY, STATIONS.sink, null);
       return;
     }
@@ -1325,16 +1420,18 @@ export class ReadySetCook2D {
       const st = this.boards[0].ing === 'tomato' ? STATIONS.board0 : STATIONS.tomato;
       this.setChefDestination(c, st.standX, st.standY, st, null);
     } else if ((targetDish === 'caprese' || targetDish === 'pizza') && !heldItems.includes('mozz_cut')) {
-      if (this.difficultyDirector && !this.difficultyDirector.cheeseSpawnerUnlocked) {
-        this.difficultyDirector.enterPhase3(false);
-      }
+      if (!this.difficultyDirector?.cheeseSpawnerUnlocked) return;
       const st = this.boards[1].ing === 'mozzarella' ? STATIONS.board1 : STATIONS.mozzarella;
       this.setChefDestination(c, st.standX, st.standY, st, null);
     } else if (targetDish === 'pizza' && !heldItems.includes('dough')) {
-      if (this.difficultyDirector && !this.difficultyDirector.bakingOvenUnlocked) {
-        this.difficultyDirector.enterPhase3(false);
-      }
+      if (!this.difficultyDirector?.bakingOvenUnlocked) return;
       this.setChefDestination(c, STATIONS.dough.standX, STATIONS.dough.standY, STATIONS.dough, null);
+    } else if (c.hold?.kind === 'item') {
+      const idx = this.plates.findIndex((p) => p.hasPlate && !p.items.length && !p.dish);
+      if (idx >= 0) {
+        const st = idx === 0 ? STATIONS.plateTop : STATIONS.plateBot;
+        this.setChefDestination(c, st.standX, st.standY, st, null);
+      }
     }
   }
 
@@ -1386,6 +1483,9 @@ export class ReadySetCook2D {
   }
 
   tryAddHeldItem(c, newItemId) {
+    if (!['tomato_cut', 'mozz_cut', 'dough'].includes(newItemId)) return false;
+    if (c.hold && !['item', 'dish'].includes(c.hold.kind)) return false;
+    if (c.hold?.kind === 'dish' && !['tomato_salad', 'caprese'].includes(c.hold.dish)) return false;
     const alreadyHasPlate = !!c.hold?.hasPlate;
     const baseItems = c.hold
       ? c.hold.items
@@ -1455,20 +1555,38 @@ export class ReadySetCook2D {
 
   // Context-Aware Interaction — uỷ quyền cho PlayerController (cùng StationLogic & CrisisManager)
   interactAt(c, st, tb) {
+    if (this.matchOver || !c) return false;
     if (!this.isHost && c === this.myChef && this.g?.session?.role === 'client') {
+      const key = st?.id || (tb ? `table_${tb.id}` : 'none');
+      if (this.lastClientAction?.key === key && this.t - this.lastClientAction.at < 0.18) return false;
+      this.lastClientAction = { key, at: this.t };
       this.g.session.sendRsc({
         kind: 'client_act',
         stationId: st?.id,
         tableId: tb?.id,
       });
+      return false;
     }
+    if (!this.isHost) return false;
+    if (st && !this.isChefNearStation(c, st)) return false;
+    if (tb && Math.hypot(c.x - tb.standX, c.y - tb.standY) > 86) return false;
     return this.playerController.interact(c, st, tb);
   }
 
+  getOrderQueue() {
+    return this.guests.filter((g) => g.phase === 'ordered' && g.dish)
+      .sort((a, b) => a.patience / a.maxPatience - b.patience / b.maxPatience).slice(0, 3);
+  }
+
   rewardCoins(amount, x, y, label) {
+    if (!this.isHost || amount <= 0) return;
     const sim = this.g?.session?.sim || this.g?.sim;
     if (sim?.st.daily?.fortune === 1) { amount = Math.round(amount * 1.2); label += ' • Quẻ Thực Thần +20%'; }
     this.earned += amount;
+    if (sim?.st.restaurant?.shift) {
+      sim.st.restaurant.shift.earned = (sim.st.restaurant.shift.earned || 0) + amount;
+      sim.touch('restaurant');
+    }
     this.addFloat(x, y, label, '#ffe066');
     while (this.starsReached < STAR_GOALS.length && this.earned >= STAR_GOALS[this.starsReached]) {
       this.starsReached++;
@@ -1481,7 +1599,7 @@ export class ReadySetCook2D {
         }
       }
       if (sim?.st?.daily) {
-        sim.st.daily.spinTickets = Math.min(5, (sim.st.daily.spinTickets || 0) + 1);
+        sim.st.daily.spinTickets = (sim.st.daily.spinTickets || 0) + 1;
         sim.touch('daily');
       }
       this.addFloat(640, 150, `⭐ ĐẠT ${this.starsReached} SAO! +${bonus}🪙 & +1 🎡 Vé Quay May Mắn!`, '#ffd54f');
@@ -1491,9 +1609,9 @@ export class ReadySetCook2D {
       for (const p of sim.connected()) {
         sim.sys('economy').earn(p.id, amount, { bonus: true });
         sim.sys('prog').addXp(p.id, 10);
-        if (sim.st.daily) sim.sys('quest')?.addActivity(8);
         sim.touch('players.' + p.id);
       }
+      if (sim.st.daily) sim.sys('quest')?.addActivity(8);
     }
   }
 
@@ -1515,6 +1633,29 @@ export class ReadySetCook2D {
       if (d < bestD) { bestD = d; bestSt = st; }
     }
     return bestSt ? { station: bestSt, key: 'st_' + bestSt.id } : null;
+  }
+
+  recordService(chef, dish) {
+    const sim = this.g?.session?.sim || this.g?.sim;
+    const p = sim?.st.players?.[chef.id];
+    if (!this.isHost || !p) return;
+    p.stats ||= {};
+    p.stats.cook = (p.stats.cook || 0) + 1;
+    p.stats.serve = (p.stats.serve || 0) + 1;
+    const r = sim.st.restaurant;
+    if (r?.shift) {
+      r.shift.served = (r.shift.served || 0) + 1;
+      r.rep = (r.rep || 0) + 1;
+      sim.sys('rest')?.updateStars();
+      sim.touch('restaurant');
+    }
+    if (p.stats.serve >= 3 && p.hats && !p.hats.includes('chef')) {
+      p.hats.push('chef');
+      sim.toast(chef.id, '👨‍🍳 Phục vụ 3 món! Bạn nhận được Mũ Đầu Bếp.', 'good');
+    }
+    sim.touch('players.' + chef.id);
+    sim.game({ type: 'cook', pid: chef.id, recipe: dish });
+    sim.game({ type: 'serve', pid: chef.id, recipe: dish });
   }
 
   canAutoTriggerNear(c, near) {
@@ -1557,11 +1698,16 @@ export class ReadySetCook2D {
     return false;
   }
 
-  update(dt) {
+  update(dt, render = true) {
     if (!this.active) return;
+    dt = clamp(dt, 0, 0.1);
     this.t += dt;
+    if (!this.isHost && !this.hasHostState) {
+      if (render) this.draw();
+      return;
+    }
     if (this.matchOver) {
-      this.draw();
+      if (render) this.draw();
       return;
     }
 
@@ -1573,13 +1719,13 @@ export class ReadySetCook2D {
       }
     }
     if (this.matchOver) {
-      this.draw();
+      if (render) this.draw();
       return;
     }
-    if (this.feverT > 0) this.feverT = Math.max(0, this.feverT - dt);
+    if (this.isHost && this.feverT > 0) this.feverT = Math.max(0, this.feverT - dt);
 
     const me = this.myChef;
-    me.chopT = Math.max(0, (me.chopT || 0) - dt);
+    for (const c of this.chefs) c.chopT = Math.max(0, (c.chopT || 0) - dt);
 
     // 1. TIẾN TRÌNH RÓT TRÀ SỮA TRÂN CHÂU (Chuẩn 2.5 giây)
     if (this.isHost && this.drinkMachine.state === 'pouring') {
@@ -1591,8 +1737,9 @@ export class ReadySetCook2D {
         this.drinkMachine.state = 'ready';
         this.g.audio.sfx('ding');
         this.spawnParticles(STATIONS.drink.x, STATIONS.drink.y - 10, 'star', 5);
-        if (!me.hold && Math.hypot(me.x - STATIONS.drink.standX, me.y - STATIONS.drink.standY) < 64) {
-          this.interactAt(me, STATIONS.drink, null);
+        const waitingChef = this.chefs.find((c) => c.present !== false && !c.hold && Math.hypot(c.x - STATIONS.drink.standX, c.y - STATIONS.drink.standY) < 64);
+        if (waitingChef) {
+          this.interactAt(waitingChef, STATIONS.drink, null);
         } else {
           this.addFloat(STATIONS.drink.x - 55, STATIONS.drink.y - 30, '🧋 Trà Sữa đã rót đầy! Chạm để lấy!', '#ffd54f');
         }
@@ -1601,11 +1748,7 @@ export class ReadySetCook2D {
 
     // 2. CẬP NHẬT CÁC HÀNH ĐỘNG GIỮ TƯƠNG TÁC
     if (this.isHost) {
-      for (const c of this.chefs) {
-        this.playerController.updateHoldActions(c, dt, (chef, st) => this.isChefNearStation(chef, st));
-      }
-    } else {
-      this.playerController.updateHoldActions(me, dt, (chef, st) => this.isChefNearStation(chef, st));
+      this.playerController.updateKitchen(this.chefs.filter((c) => c.present !== false), dt, (chef, st) => this.isChefNearStation(chef, st));
     }
 
     // 3. Mèo Mimi chỉ tự nhận đơn khi người chơi bật trợ giúp.
@@ -1628,13 +1771,13 @@ export class ReadySetCook2D {
     if (this.g.session && this.g.session.role !== 'none') {
       if (this.isHost) {
         this.netSyncT = (this.netSyncT || 0) + dt;
-        if (this.netSyncT >= 0.05) {
+        if (this.netSyncT >= 0.1) {
           this.netSyncT = 0;
           this.broadcastState();
         }
       } else {
         this.netSendT = (this.netSendT || 0) + dt;
-        if (this.netSendT >= 0.04) {
+        if (this.netSendT >= 0.05) {
           this.netSendT = 0;
           this.g.session.sendRsc({
             kind: 'client_move',
@@ -1652,6 +1795,10 @@ export class ReadySetCook2D {
     const gAx = this.g.input.axis();
     const jx = (this.touchJoy.active && this.touchJoy.dragging) ? this.touchJoy.dx : gAx.x;
     const jy = (this.touchJoy.active && this.touchJoy.dragging) ? -this.touchJoy.dy : gAx.y;
+    const keyAction = this.g.input.keys.has(' ') || this.g.input.keys.has('e') || this.g.input.keys.has('E');
+    const actionPressed = (keyAction && !this.actionKeyDown) || this.g.actionHeld;
+    this.actionKeyDown = keyAction;
+    this.g.actionHeld = false;
 
     if (Math.hypot(jx, jy) > 0.12) {
       me.target = null;
@@ -1671,8 +1818,7 @@ export class ReadySetCook2D {
         this.joyDwellT = 0;
         this.lastDwellKey = '';
       }
-      if (this.g.input.keys.has(' ') || this.g.input.keys.has('e') || this.g.input.keys.has('E') || this.g.actionHeld) {
-        this.g.actionHeld = false;
+      if (actionPressed) {
         if (near) this.interactAt(me, near.station, near.table);
       }
     } else if (me.target) {
@@ -1692,9 +1838,9 @@ export class ReadySetCook2D {
       me.vy = 0;
       const near = this.nearestInteract(me);
       if (!near) this.lastDwellKey = '';
-      if (this.g.input.keys.has(' ') || this.g.input.keys.has('e') || this.g.input.keys.has('E') || this.g.actionHeld) {
-        this.g.actionHeld = false;
+      if (actionPressed) {
         if (near) this.interactAt(me, near.station, near.table);
+        else this.autoSmartStep(me);
       }
     }
 
@@ -1705,6 +1851,13 @@ export class ReadySetCook2D {
       } else if (tb.guest && me.hold?.kind === 'dish' && me.hold.dish === tb.guest.dish && Math.hypot(me.x - tb.standX, me.y - tb.standY) < 54) {
         this.interactAt(me, null, tb);
       }
+    }
+
+    for (const c of this.chefs) {
+      if (c === me) continue;
+      const blend = 1 - Math.exp(-16 * dt);
+      c.renderX = (c.renderX ?? c.x) + (c.x - (c.renderX ?? c.x)) * blend;
+      c.renderY = (c.renderY ?? c.y) + (c.y - (c.renderY ?? c.y)) * blend;
     }
 
     if (Math.hypot(me.vx, me.vy) > 40) {
@@ -1757,7 +1910,7 @@ export class ReadySetCook2D {
             this.g.audio.sfx('bell');
           }
         } else if (g.phase === 'wait_order' || g.phase === 'ordered') {
-          g.patience -= dt * 0.35 * patienceMult;
+          g.patience -= dt * patienceMult;
           if (g.patience <= 0) {
             g.phase = 'walk_out';
             g.path = this.findPath(tb.walkX ?? tb.standX, tb.walkY ?? tb.standY, DOOR_POS.x, DOOR_POS.y);
@@ -1831,7 +1984,7 @@ export class ReadySetCook2D {
       if (f.life <= 0) this.floats.splice(i, 1);
     }
 
-    this.draw();
+    if (render) this.draw();
   }
 
   buildFloorCache() {
@@ -1946,7 +2099,7 @@ export class ReadySetCook2D {
     const actors = [
       ...this.guests.map((g) => ({ type: 'guest', y: g.y, obj: g })),
       ...(this.helperOn && this.sousChef ? [{ type: 'sousChef', y: this.sousChef.y, obj: this.sousChef }] : []),
-      ...this.chefs.map((c) => ({ type: 'chef', y: c.y, obj: c })),
+      ...this.chefs.filter((c) => c.present !== false).map((c) => ({ type: 'chef', y: c.renderY ?? c.y, obj: c })),
     ].sort((a, b) => a.y - b.y);
 
     for (const a of actors) {
@@ -1980,13 +2133,14 @@ export class ReadySetCook2D {
     for (const f of this.floats) {
       ctx.save();
       ctx.globalAlpha = clamp(f.life / f.maxLife, 0, 1);
-      ctx.font = '900 21px "Baloo 2", sans-serif';
+      ctx.font = '800 18px "Baloo 2", sans-serif';
       ctx.textAlign = 'center';
       ctx.strokeStyle = '#1a110b';
       ctx.lineWidth = 5;
-      ctx.strokeText(f.text, f.x, f.y);
+      const textX = clamp(f.x, 320, 960);
+      ctx.strokeText(f.text, textX, f.y, 620);
       ctx.fillStyle = f.color;
-      ctx.fillText(f.text, f.x, f.y);
+      ctx.fillText(f.text, textX, f.y, 620);
       ctx.restore();
     }
 
@@ -2014,6 +2168,9 @@ export class ReadySetCook2D {
     ctx.font = '800 18px "Baloo 2", sans-serif';
     ctx.fillStyle = '#4e3b2c';
     ctx.fillText(`🍽️ ${this.served} món đã phục vụ`, 640, 360);
+    ctx.font = '700 14px "Baloo 2", sans-serif';
+    ctx.fillStyle = '#775b43';
+    ctx.fillText(this.earned > this.previousBest && this.served > 0 ? '🏆 Kỷ lục mới của nông trại!' : `Kỷ lục nông trại: ${fmt(this.previousBest)} xu`, 640, 385);
 
     ctx.font = '900 38px sans-serif';
     ctx.fillStyle = '#b0a18e';
@@ -3101,7 +3258,7 @@ export class ReadySetCook2D {
     ctx.save();
     const moving = Math.hypot(c.vx, c.vy) > 5;
     const bob = moving ? Math.sin(this.t * 16) * 3 : Math.sin(this.t * 4) * 1.2;
-    ctx.translate(c.x, c.y + bob);
+    ctx.translate(c === this.myChef ? c.x : c.renderX ?? c.x, (c === this.myChef ? c.y : c.renderY ?? c.y) + bob);
 
     // Bóng đổ + Vòng tròn trắng phát sáng dưới chân nhân vật YOU (Hoặc vàng rực khi đang FEVER ×2)
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
@@ -3416,10 +3573,7 @@ export class ReadySetCook2D {
     }
 
     // 4. HÀNG ĐỢI PHIẾU ORDER TRÊN ĐỈNH MÀN HÌNH (Chuẩn Overcooked! / Ready, Set, Cook!)
-    const orderedGuests = this.guests
-      .filter((g) => g.phase === 'ordered' && g.dish)
-      .sort((a, b) => a.patience / a.maxPatience - b.patience / b.maxPatience)
-      .slice(0, 3);
+    const orderedGuests = this.getOrderQueue();
 
     for (let i = 0; i < orderedGuests.length; i++) {
       const g = orderedGuests[i];
@@ -3549,6 +3703,13 @@ export class ReadySetCook2D {
 
   // Cụm điều khiển cảm ứng dành riêng cho Điện Thoại nằm gọn trên thanh dưới (không che bất kỳ quầy bếp nào!)
   drawMobileControlsOverlay(ctx) {
+    if (VP.phone && this.touchOrdersEl) {
+      const queue = this.getOrderQueue();
+      const markup = queue.map((g) => `<button data-kitchen="order" data-guest="${g.id}"><small>Bàn ${g.tableId + 1}</small><b>${g.dish === 'pizza' ? '🍕 Pizza' : g.dish === 'soda' ? '🧋 Trà sữa' : g.dish === 'caprese' ? '🥗 Caprese' : '🍅 Salad'}</b><i><u style="width:${Math.round(clamp(g.patience / g.maxPatience, 0, 1) * 100)}%"></u></i></button>`).join('');
+      if (this.touchOrdersEl._html !== markup) { this.touchOrdersEl._html = markup; this.touchOrdersEl.innerHTML = markup; }
+      const label = this.matchOver ? 'Chơi lại' : 'Thao tác';
+      if (this.touchActionLabel.textContent !== label) this.touchActionLabel.textContent = label;
+    }
     const isDragging = this.touchJoy.active && this.touchJoy.dragging;
     const jx = isDragging ? this.touchJoy.sx : JOY_HOME.x;
     const jy = isDragging ? this.touchJoy.sy : JOY_HOME.y;
@@ -3572,6 +3733,7 @@ export class ReadySetCook2D {
     }
     ctx.restore();
 
+    if (VP.phone) return;
     ctx.save();
     this.inkRoundRect(ctx, ACT_BTN.x - 76, ACT_BTN.y - 22, 152, 44, 20, '#43a047');
     ctx.font = '900 16px "Baloo 2", sans-serif';

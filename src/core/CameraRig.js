@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { damp, clamp } from './util.js';
 
-const _tmpV = new THREE.Vector3();
+const _screen = new THREE.Vector2(), _raycaster = new THREE.Raycaster();
 const _projV = new THREE.Vector3();
 
 // Camera: 3D cận cảnh sắc nét chuẩn game nông trại Mobile HD, Góc nhìn thứ nhất chuẩn FPS, và 2D top-down.
@@ -12,7 +12,7 @@ export class CameraRig {
     this.ortho = new THREE.OrthographicCamera(-10, 10, 10, -10, -80, 260);
     this.cam = this.persp; this.mode = '3D'; this.aspect = aspect;
     // Góc nhìn 3D gần hơn (dist = 14.5 thay vì 26), góc nghiêng 0.58 giúp nhân vật, cây trồng và thú cưng to rõ, sắc nét
-    this.yaw = 0.08; this.pitch = 0.58; this.dist = 14.5; this.tYaw = 0.08; this.tPitch = 0.58; this.tDist = 14.5;
+    this.yaw = 0.08; this.pitch = 0.66; this.dist = 15.5; this.tYaw = 0.08; this.tPitch = 0.66; this.tDist = 15.5;
     this.fpPitch = 0; this.tFpPitch = 0;
     this.velYaw = 0; this.velPitch = 0;
     // Tuỳ chỉnh người chơi: fov (45..90, mặc định 54 cho 3D nét căng), sens (0.3..2.2, mặc định 1.0), smooth (0.1..1.0, mặc định 0.8)
@@ -24,7 +24,7 @@ export class CameraRig {
   applyPrefs({ fov, sens, smooth } = {}) {
     if (fov !== undefined) this.fov = clamp(+fov || 54, 44, 90);
     if (sens !== undefined) this.sens = clamp(+sens || 1.0, 0.25, 2.5);
-    if (smooth !== undefined) this.smooth = clamp(+smooth ?? 0.8, 0.05, 1.0);
+    if (smooth !== undefined) this.smooth = clamp(Number.isFinite(+smooth) ? +smooth : 0.8, 0.05, 1.0);
     this.updateFov();
   }
   updateFov() {
@@ -67,9 +67,9 @@ export class CameraRig {
   zoomBy(f) { this.tDist = clamp(this.tDist * f, 7.5, 28); }
   // Chuyển nhanh 3 mức cự ly camera 3D: Gần sát rõ nét (11m) -> Vừa chuẩn (14.5m) -> Rộng (20m)
   cycleZoomPreset() {
-    if (this.tDist > 17) { this.tDist = 11.0; this.tPitch = 0.52; return '🔍 Cận cảnh HD (Siêu nét)'; }
-    if (this.tDist < 13) { this.tDist = 14.5; this.tPitch = 0.58; return '🎥 Cự ly Chuẩn (Mượt & Rõ)'; }
-    this.tDist = 19.5; this.tPitch = 0.66; return '🌄 Góc nhìn Rộng';
+    if (this.tDist > 17) { this.tDist = 11.0; this.tPitch = 0.62; return '🔍 Nhìn gần'; }
+    if (this.tDist < 13) { this.tDist = 15.5; this.tPitch = 0.66; return '🎥 Góc nhìn tiêu chuẩn'; }
+    this.tDist = 19.5; this.tPitch = 0.74; return '🌄 Nhìn toàn cảnh';
   }
   forward() { const y = this.mode === '2D' ? 0 : this.yaw; return { x: -Math.sin(y), z: -Math.cos(y) }; }
   right() { const y = this.mode === '2D' ? 0 : this.yaw; return { x: Math.cos(y), z: -Math.sin(y) }; }
@@ -115,8 +115,12 @@ export class CameraRig {
   }
   // tia từ toạ độ màn hình (px) -> điểm trên mặt phẳng y = h (Zero GC allocation)
   groundPoint(px, py, w, h, y = 0) {
-    _tmpV.set((px / w) * 2 - 1, -(py / h) * 2 + 1, 0.5).unproject(this.cam);
-    const o = this.cam.position, dir = _tmpV.sub(o).normalize(); if (Math.abs(dir.y) < 1e-4) return null;
+    if (w <= 0 || h <= 0) return null;
+    _screen.set((px / w) * 2 - 1, -(py / h) * 2 + 1);
+    // Camera 2D có các tia song song; không bắn tia từ vị trí camera như phối cảnh 3D.
+    this.cam.updateMatrixWorld();
+    _raycaster.setFromCamera(_screen, this.cam);
+    const { origin: o, direction: dir } = _raycaster.ray; if (Math.abs(dir.y) < 1e-4) return null;
     const t = (y - o.y) / dir.y; if (t < 0) return null;
     return { x: o.x + dir.x * t, z: o.z + dir.z * t };
   }

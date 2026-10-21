@@ -179,14 +179,30 @@ export class UI {
   refreshSprint() { const b = $('#btnSprint'); if (b) b.classList.toggle('on', !!(this.g.local?.sprint || this.g.input?.keys.has('Shift'))); }
   refreshHotbar() {
     const g = this.g, me = g.local.me; if (!me) return; const w = WEAPONS[me.weapon] || WEAPONS.slipper, ic = ['⛏️', '💧', CROPS[me.sel]?.icon || '🌱', '🥣', '🎣', w.icon];
-    ic.forEach((x, i) => { const el = $('#tool' + i); if (el) el.textContent = x; }); document.querySelectorAll('.tool').forEach((el, i) => el.classList.toggle('on', g.local.tool === i));
-    const chip = $('#seedChip'); chip.classList.toggle('hidden', g.local.tool !== 2); const selCrop = CROPS[me.sel]; chip.textContent = `🌱 ${selCrop?.name || ''} (${selCrop ? '⏱️' + fmtGrow(selCrop.grow) : ''}) ×${(g.store.state.inventory.players[me.id] || {})['seed_' + me.sel] || 0} ▾`;
+    const names = ['Cuốc đất', 'Tưới nước', 'Gieo hạt', 'Cho thú ăn', 'Câu cá', w.name];
+    ic.forEach((x, i) => { const el = $('#tool' + i); if (el && el.textContent !== x) el.textContent = x; });
+    document.querySelectorAll('.tool').forEach((el, i) => {
+      el.classList.toggle('on', g.local.tool === i);
+      el.setAttribute('aria-pressed', String(g.local.tool === i));
+      el.setAttribute('aria-label', names[i]); el.title = `${names[i]} (${i + 1})`;
+    });
+    const action = $('#btnAct'), actionLabel = action?.querySelector('small'), actionIcon = action?.querySelector('span');
+    const ripe = g.local.plot?.c?.s === 'ripe' && g.local.tool < 3;
+    const label = ripe ? 'Thu hoạch' : ['Cuốc', 'Tưới', 'Gieo', 'Cho ăn', 'Thả câu', 'Đánh'][g.local.tool];
+    if (actionLabel && actionLabel.textContent !== label) actionLabel.textContent = label;
+    if (actionIcon) { const icon = ripe ? '🧺' : ic[g.local.tool]; if (actionIcon.textContent !== icon) actionIcon.textContent = icon; }
+    const chip = $('#seedChip'); chip.classList.toggle('hidden', g.local.tool !== 2); const selCrop = CROPS[me.sel];
+    const chipText = `🌱 ${selCrop?.name || ''} (${selCrop ? '⏱️' + fmtGrow(selCrop.grow) : ''}) ×${(g.store.state.inventory.players[me.id] || {})['seed_' + me.sel] || 0} ▾`;
+    if (chip.textContent !== chipText) chip.textContent = chipText;
   }
   update(dt, ti) {
     const g = this.g, st = g.store.state, me = g.local.me; if (g.mode !== 'play' || !me) return;
+    // The kitchen draws its own HUD; the hidden farm HUD does not need DOM work.
+    if (g.rsc2d?.active) return;
     const set = (id, v) => { if (this.cache[id] !== v) { this.cache[id] = v; const el = $('#' + id); if (el) el.textContent = v; } };
     const setBar = (id, value) => { const pct = Math.round(clamp(value, 0, 100)); if (this.cache[id] !== pct) { this.cache[id] = pct; const el = $('#' + id); if (el) el.style.width = pct + '%'; } };
-    set('vMoney', fmt(me.money)); set('vFund', fmt(st.economy.fund)); const lp = levelProgress(st.farm.xp); set('vLvl', 'Cấp ' + st.farm.level); const xp = $('#vXp u'); if (xp) xp.style.width = Math.max(12, lp.pct * 100) + '%';
+    set('vMoney', fmt(me.money)); set('vFund', fmt(st.economy.fund)); const lp = levelProgress(st.farm.xp); set('vLvl', 'Cấp ' + st.farm.level);
+    const xpPct = Math.round(lp.pct * 100); if (this.cache.xpPct !== xpPct) { this.cache.xpPct = xpPct; const xp = $('#vXp u'); if (xp) xp.style.width = Math.max(2, xpPct) + '%'; }
     setBar('vFood', me.food ?? 100); setBar('vHp', me.hp ?? 100);
     set('vTime', hhmm(ti.hour)); set('vDay', `N${ti.hour < 6 ? ti.day : ti.day} ${SEASON_ICONS[ti.season]}`); set('vWx', st.world.weather !== 'clear' ? WEATHER[st.world.weather].icon : ti.night ? '🌙' : '☀️'); set('vAv', me.avatar); set('vName', me.name + ((me.sleeping || g.local.inBed) ? ' 💤' : '')); set('vPl', 'Cấp ' + me.level);
     set('vStreak', st.daily?.streak || 1);
@@ -644,76 +660,16 @@ export class UI {
     let h = '';
     if (!home) {
       const tab = this.restTab || 'rsc';
-      const shiftOn = !!r.shift?.active;
       h += `<div class="tabs">${[
-        ['rsc', '🍕 Bếp 2.5D (Ready, Set, Cook!)'],
+        ['rsc', '👨‍🍳 Bếp chơi chung'],
         ['cook', '🍳 Nấu Nông Sản'],
         ['up', '👑 Làm Chủ & Nâng Cấp'],
       ].map(([k, n]) => btn('rtab', n, `data-v="${k}"`, tab === k ? 'on' : '')).join('')}</div>`;
 
       if (tab === 'rsc') {
-        const guests = Object.values(r.guests || {}).filter((g) => g.state === 'seated');
-        const dirtyList = Object.entries(r.dirtyTables || {});
-        h += `<div class="card big1" style="background:linear-gradient(135deg,#fff8e7,#ffe8c2);border:2px solid #e67e22"><span class="ti big">🍕</span><b>Nhà Hàng Pizza & Trà Đào 2.5D (Chuẩn Ready, Set, Cook!)</b><small>✨ <b>Tính năng mới:</b> Hàng đợi Phiếu Order trên đỉnh màn hình 📋 • Máy pha Trà Đào Cam Sả 🥤 • Mèo Phụ Bếp Mimi 🐱 tự động bưng món & dọn bàn • Combo Fever ×2 Xu 🔥!</small>${btn('shift', '▶️ VÀO BẾP 2.5D: READY, SET, COOK! NGAY', '', 'go')}</div>`;
-        h += `<div class="row between">${btn('shift', shiftOn ? '🍕 Mở Bếp 2.5D Toàn Màn Hình' : '▶️ Bắt đầu Ca Làm Thêm', `data-on="${shiftOn ? 0 : 1}"`, 'sm go')}${btn('quickstep', '⚡ Tự động làm bước tiếp theo (Ngoài sân)', '', 'sm')}</div>`;
-        h += `<div class="note">✋ Đang cầm: <b>${esc(fmtCarry(me.carry))}</b> • Đĩa sạch: <b>${r.cleanPlates ?? 6}/${r.maxPlates ?? 6} 🍽️</b> • Đã phục vụ: <b>${r.shift?.served || 0}</b> • Thu nhập ca: <b>+${fmt(r.shift?.earned || 0)} 🪙</b>${(r.shift?.combo || 0) >= 2 ? ` • 🔥Combo ×${r.shift.combo}` : ''}</div>`;
-
-        // Khách đang ngồi quanh Bàn Tiệc Oval
-        h += `<h4>🛎️ Khách đang gọi món tại Bàn Tiệc Oval (${guests.length})</h4>`;
-        if (guests.length) {
-          h += guests.map((g) => {
-            const c = CUSTOMERS[g.kind], d = RECIPES[g.dish];
-            const req = (d?.rsc || ['veg', 'veg']).map((k) => RSC_CRATES[k]?.icon || '').join(' + ');
-            const canServe = !!(bag['dish_' + g.dish] || me.carry === 'dish_' + g.dish || (r.pass || []).some((x) => x.recipe === g.dish));
-            return `<div class="li"><span class="ti">${c.icon}</span><div><b>${c.name} — cần ${d?.icon} ${d?.name}</b><small>Công thức Bếp: <b>${req} ➔ 🔪 ➔ ${d?.pot === 'pot' ? '🍲' : '🍳'}</b></small>${bar(g.patience / c.patience, 'pat')}</div>${canServe ? btn('serveguest', `🍽️ Phục vụ ngay`, `data-g="${g.id}"`, 'sm go') : btn('quickstep', '⚡ Làm món', `data-g="${g.id}"`, 'sm')}</div>`;
-          }).join('');
-        } else {
-          h += `<p class="empty">${shiftOn ? 'Khách đang đi vào bàn tiệc...' : 'Bấm "VÀO BẾP 2.5D" để trải nghiệm nhà hàng Pizza & Trà Đào chuẩn game gốc!'}</p>`;
-        }
-
-        // 1. 6 Thùng Nguyên Liệu Miễn Phí của Quán
-        h += `<h4>1️⃣ Lấy Nguyên Liệu Tại 6 Thùng Bếp (Miễn phí khi làm thêm)</h4><div class="chips">${RSC_CRATE_LIST.map((ck) => {
-          const cr = RSC_CRATES[ck];
-          return btn('grabcrate', `${cr.icon} ${cr.name}`, `data-c="${ck}"`, me.carry === 'raw:' + ck ? 'sm on' : 'sm ghost');
-        }).join('')}${me.carry ? btn('usetrash', '🗑️ Bỏ đồ đang cầm', '', 'sm ghost') : ''}</div>`;
-
-        // 2. 2 Bàn Thớt Sơ Chế & Bồn Rửa Bát & Quầy Trả Món
-        const b0 = r.boards?.b0, b1 = r.boards?.b1;
-        h += `<h4>2️⃣ Bàn Thớt Sơ Chế 🔪 • Quầy Trả Món 🛎️ • Bồn Rửa Bát 🚰</h4><div class="row wrap">`;
-        h += btn('useboard', `🔪 Thớt 1: ${b0 ? `${RSC_CRATES[b0.ing]?.icon} (${b0.state === 'ready' ? 'Lấy!' : 'Thái nhanh!'})` : 'Trống'}`, 'data-b="b0"', b0 || me.carry?.startsWith('raw:') ? 'sm go' : 'sm ghost');
-        h += btn('useboard', `🔪 Thớt 2: ${b1 ? `${RSC_CRATES[b1.ing]?.icon} (${b1.state === 'ready' ? 'Lấy!' : 'Thái nhanh!'})` : 'Trống'}`, 'data-b="b1"', b1 || me.carry?.startsWith('raw:') ? 'sm go' : 'sm ghost');
-        h += btn('usepass', `🛎️ Quầy Trả Món (${(r.pass || []).length} đĩa)`, '', (me.carry?.startsWith('dish_') || (r.pass || []).length) ? 'sm go' : 'sm ghost');
-        h += btn('usesink', `🚰 Rửa Bát (${r.cleanPlates ?? 6}/${r.maxPlates ?? 6}🍽️)`, '', me.carry === 'dirty_plate' || dirtyList.length ? 'sm go' : 'sm ghost');
-        if (dirtyList.length) {
-          h += btn('cleartable', `🪙 Thu Tip & Dọn ${dirtyList.length} bàn bẩn`, `data-tb="${dirtyList[0][0]}"`, 'sm on');
-        }
-        h += `</div>`;
-
-        // 3. 3 Bếp Chảo / Nồi
-        h += `<h4>3️⃣ Dãy 3 Bếp Chảo & Nồi (Ghép nguyên liệu 1/2 ➔ Nấu chín)</h4><div class="stations">${['s0', 's1', 's2'].map((k, idx) => {
-          const s = r.stations[k];
-          let stText = 'Rảnh', btnHtml = btn('usestove', 'Cho nguyên liệu', `data-st="${k}"`, me.carry?.startsWith('prep:') || me.carry?.startsWith('raw:') ? 'sm go' : 'sm off');
-          if (s) {
-            const rec = RECIPES[s.recipe];
-            if (s.state === 'prep') {
-              const prog = rscProgress(s).map((p) => `${p.icon}${p.have}/${p.need}`).join(' ');
-              stText = `Đang ghép: ${prog}`;
-              btnHtml = btn('usestove', 'Thêm nguyên liệu', `data-st="${k}"`, me.carry?.startsWith('prep:') || me.carry?.startsWith('raw:') ? 'sm go' : 'sm off');
-            } else if (s.state === 'cooking') {
-              stText = `Đang nấu (${Math.max(0, Math.ceil(s.t0 + s.dur - st.world.t))}s)`;
-              btnHtml = '<small>🔥 Đang xèo xèo...</small>';
-            } else if (s.state === 'ready') {
-              stText = s.warned ? '⚠️ SẮP KHÉT!' : '✨ Đã chín!';
-              btnHtml = btn('collect', '🍽️ Lấy ra đĩa', `data-st="${k}"`, 'sm go');
-            } else if (s.state === 'burning' || s.state === 'burnt') {
-              stText = '🔥 ĐANG CHÁY!';
-              btnHtml = btn('usestove', '🧯 Dập lửa ngay!', `data-st="${k}"`, 'sm on');
-            }
-            return `<div class="station ${s.state}"><b>${rec?.icon || '🍳'}</b><small>${esc(rec?.name || 'Bếp ' + (idx + 1))}</small><small>${stText}</small>${btnHtml}</div>`;
-          }
-          return `<div class="station"><b>${idx === 1 ? '🍲' : '🍳'}</b><small>Bếp ${idx + 1} (${stText})</small>${btnHtml}</div>`;
-        }).join('')}</div>`;
-        return h;
+        const online = Object.values(st.players).filter((p) => p.connected);
+        const names = online.map((p) => esc(p.name)).join(' & ');
+        return h + `<div class="kitchenLobby"><span class="ti huge">👨‍🍳</span><b>Bếp của cả nhà</b><p>Một ca 3 phút. Cùng chia việc và phục vụ thật nhiều khách để đạt 3 sao.</p><div class="note">👥 ${names} • ${online.length} người trong phòng</div>${btn('shift', '▶ Vào bếp chơi chung', '', 'go')}<ol><li>Chạm vào khách hoặc phiếu đơn để nhận món.</li><li>Lấy nguyên liệu, mang đến thớt để sơ chế.</li><li>Ghép đúng công thức trên đĩa; pizza cần nướng.</li><li>Bưng món tới đúng khách, dọn đĩa bẩn rồi rửa.</li></ol><small class="hint">Chạm trạm để tự đi tới, hoặc dùng WASD / cần điều khiển. Cả nhà dùng chung đơn, bếp và thời gian ca.</small></div>`;
       }
 
       if (tab === 'up') {
@@ -776,13 +732,13 @@ export class UI {
     const seg = (a, cur, opts) => `<div class="chips">${opts.map(([v, n]) => btn(a, n, `data-v="${v}"`, cur === v ? 'on' : '')).join('')}</div>`;
     const fov = Math.round(S.fov || 54), sens = Math.round((S.sens ?? 1.0) * 100), smooth = Math.round((S.smooth ?? 0.8) * 100);
     const curDist = Math.round(g.rig?.tDist || 14);
-    let h = `<h4>🎥 Góc nhìn 3D Cận Cảnh HD & Độ mượt (${Math.round(g.gfx?.fps || 60)} FPS)</h4>`;
-    h += `${seg('view', g.view, [['3D', '🎥 3D Cận Cảnh HD'], ['FP', '👁️ Thứ nhất (FPS)'], ['2D', '🗺️ 2D Siêu Nhẹ']])}`;
+    let h = `<h4>🎥 Góc nhìn • ${Math.round(g.gfx?.fps || 60)} FPS</h4>`;
+    h += `${seg('view', g.view, [['3D', '🎥 3D'], ['FP', '👁️ Thứ nhất'], ['2D', '🗺️ Nhìn từ trên']])}`;
     h += `<div class="row wrap">${btn('zoomcam', `🔍 Đổi Cự Ly Camera (Hiện: ${curDist}m)`, '', 'sm go')}${btn('resetcam', '↺ Đặt lại góc nhìn chuẩn', '', 'sm ghost')}</div>`;
     h += `<label class="sl"><span>Độ rộng góc nhìn (FOV)</span><input type="range" min="42" max="85" value="${fov}" data-cam="fov"><b id="lbl_fov">${fov}°</b></label>`;
     h += `<label class="sl"><span>Độ nhạy xoay màn hình</span><input type="range" min="30" max="200" value="${sens}" data-cam="sens"><b id="lbl_sens">${sens}%</b></label>`;
     h += `<label class="sl"><span>Độ mượt khi xoay (Quán tính)</span><input type="range" min="10" max="100" value="${smooth}" data-cam="smooth"><b id="lbl_smooth">${smooth}%</b></label>`;
-    h += `<h4>✨ Chất lượng Đồ hoạ (Đã tối ưu chống giật Điện Thoại)</h4>${seg('gfx', S.gfx, [['auto', `Tự động (${g.gfx.level})`], ['low', 'Siêu Mượt (Máy yếu)'], ['medium', 'Chuẩn 60 FPS'], ['high', 'Siêu Nét HD']])}`;
+    h += `<h4>✨ Chất lượng đồ hoạ</h4>${seg('gfx', S.gfx, [['auto', `Tự cân bằng (${g.gfx.level})`], ['low', 'Nhẹ'], ['medium', 'Cân bằng'], ['high', 'Chi tiết']])}<small class="hint">Tự cân bằng điều chỉnh độ phân giải khi tốc độ máy giảm.</small>`;
     h += `<h4>🔊 Âm thanh</h4>${[['master', 'Tổng'], ['music', 'Nhạc'], ['sfx', 'Hiệu ứng']].map(([k, n]) => `<label class="sl"><span>${n}</span><input type="range" min="0" max="100" value="${Math.round(S[k] * 100)}" data-vol="${k}"></label>`).join('')}`;
     h += `<h4>👤 Đổi Nhân Vật Nhanh (Hiếu 💙 / Huyền 💖)</h4>`;
     h += `<div class="row wrap">${btn('switchChar', '👦 Đổi thành Hiếu 💙', 'data-who="hieu"', me.name === 'Hiếu' ? 'go' : '')}${btn('switchChar', '👧 Đổi thành Huyền 💖', 'data-who="huyen"', me.name === 'Huyền' ? 'go' : '')}</div>`;

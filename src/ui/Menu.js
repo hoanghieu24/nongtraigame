@@ -65,17 +65,17 @@ export class Menu {
   render(screen) {
     this.screen = screen; const F = this.farms, g = this.g, last = F[0]; let h = '';
     if (screen === 'main') {
-      h = `<div class="menuHero"><div class="title"><span class="tl1">HIẾU ❤️ HUYỀN</span><span class="tl2">FARM FAMILY PARTY</span><small>✨ 3D Cận Cảnh HD • 🍕 Quán Pizza & Trà Sữa • 🎮 Khu Trò Chơi Đôi</small><div class="menuDailyTag">👦 Hiếu 💙 & 👧 Huyền 💖 • 🎁 Điểm Danh • 🎡 Vòng Quay Tình Yêu</div></div>
+      h = `<div class="menuHero"><div class="title"><span class="tl1">HIẾU ❤️ HUYỀN</span><span class="tl2">FARM FAMILY PARTY</span><small>Trồng một khu vườn. Cùng nuôi một tổ ấm.</small><div class="menuDailyTag">🌱 Chăm ruộng • 🐔 Nuôi thú • 👨‍🍳 Cùng vào bếp</div></div>
       ${this.coupleSwitchHtml()}</div>
       <div class="mbtns">
         <button class="mb primary" data-m="${last ? 'resume' : 'create'}" data-code="${last?.code || ''}">${last ? `▶ TIẾP TỤC CHƠI (${esc(this.profile.name)})` : `▶ BẮT ĐẦU CHƠI (${esc(this.profile.name)})`}<small>${last ? `${esc(last.name)} • Ngày ${last.day} • Mã phòng: ${last.code} ☁️` : 'Vào Nông Trại Hiếu & Huyền 💕 ngay!'}</small></button>
-        <button class="mb rscSpecial" data-m="playArcade">🎮 KHU VUI CHƠI HIẾU ❤️ HUYỀN<small>Đập Chuột • Hứng Dâu • Lật Thẻ Đôi • Đua Thú • Bắn Tim</small></button>
-        <button class="mb rscSpecial restaurantEntry" data-m="playRsc">🍕 VÀO NGAY QUÁN ĂN 2.5D<small>Ready, Set, Cook! • 3 giai đoạn • Chơi chung 2 người</small></button>
+        <button class="mb rscSpecial restaurantEntry" data-m="playRsc">👨‍🍳 BẾP CHƠI CHUNG<small>Nhận đơn, nấu món, phục vụ • Một ca cho cả nhà</small></button>
+        <button class="mb arcadeEntry" data-m="playArcade">🎮 TRÒ CHƠI ĐÔI<small>Đập chuột • Hứng dâu • Lật thẻ • Đua thú</small></button>
         <div class="mGrid">
           <button class="mb smBtn" data-m="create">🌱 Tạo Farm</button>
           <button class="mb smBtn" data-m="join">👫 Vào Bạn Bè</button>
           <button class="mb smBtn" data-m="farms">📂 Đã Lưu (${F.length})</button>
-          <button class="mb smBtn" data-m="settings">⚙️ Cài Đặt HD</button>
+          <button class="mb smBtn" data-m="settings">⚙️ Cài Đặt</button>
         </div></div>`;
     } else if (screen === 'farms') {
       h = this.card(`<h2>📂 Farm đã lưu (Đồng bộ Cloud ☁️)</h2><div class="flist">${F.length ? F.map((f) => `<div class="fi"><div><b>${esc(f.name)}</b><small>Ngày ${f.day} • ${esc((f.players || []).join(', '))} • ${ago(f.savedAt)}</small><span class="badge ${f.role}">${f.cloud ? '☁️ Cloud' : f.role === 'host' ? 'Chủ farm' : 'Khách'} • mã ${f.code}</span></div><button class="b sm" data-m="resume" data-code="${f.code}">Vào chơi</button><button class="b sm ghost" data-m="export" data-code="${f.code}" title="Tải file backup .json">💾</button><button class="b sm ghost" data-m="del" data-code="${f.code}">🗑</button></div>`).join('') : '<p class="empty">Chưa có bản lưu nào. Bạn có thể tạo mới hoặc nhập file backup (.json) bên dưới.</p>'}</div><div class="row wrap"><button class="mb smBtn" data-m="import">📤 Nhập File Backup (.json)</button><button class="mb ghost" data-m="back">← Quay lại</button></div>`);
@@ -94,7 +94,7 @@ export class Menu {
         <label class="sl"><span>Góc nhìn (FOV)</span><input type="range" min="42" max="85" value="${fov}" data-cam="fov"><b id="mlbl_fov">${fov}°</b></label>
         <label class="sl"><span>Độ nhạy xoay</span><input type="range" min="30" max="200" value="${sens}" data-cam="sens"><b id="mlbl_sens">${sens}%</b></label>
         <label class="sl"><span>Độ mượt (Quán tính)</span><input type="range" min="10" max="100" value="${smooth}" data-cam="smooth"><b id="mlbl_smooth">${smooth}%</b></label>
-        <label>✨ Chất lượng Đồ hoạ (Đã tối ưu 60 FPS Điện Thoại)</label><div class="chips">${[['auto', 'Tự động'], ['low', 'Siêu Mượt'], ['medium', 'Chuẩn 60 FPS'], ['high', 'Siêu Nét HD']].map(([v, n]) => `<button class="b ${s.gfx === v ? 'on' : ''}" data-m="gfx" data-v="${v}">${n}</button>`).join('')}</div>
+        <label>✨ Chất lượng đồ hoạ</label><div class="chips">${[['auto', 'Tự cân bằng'], ['low', 'Nhẹ'], ['medium', 'Cân bằng'], ['high', 'Chi tiết']].map(([v, n]) => `<button class="b ${s.gfx === v ? 'on' : ''}" data-m="gfx" data-v="${v}">${n}</button>`).join('')}</div><small>Tự cân bằng sẽ điều chỉnh độ phân giải theo tốc độ máy.</small>
         <label>🔊 Âm thanh</label>
         ${[['master', 'Âm lượng tổng'], ['music', 'Nhạc nền'], ['sfx', 'Hiệu ứng']].map(([k, n]) => `<label class="sl"><span>${n}</span><input type="range" min="0" max="100" value="${Math.round(s[k] * 100)}" data-vol="${k}"></label>`).join('')}
         <div class="row"><button class="mb ghost" data-m="back">← Quay lại</button></div>`);

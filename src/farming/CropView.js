@@ -1,8 +1,12 @@
 import * as THREE from 'three';
 import { M, MAT, bake, B, Cy, S, Co, To, merge, signTexture } from '../art/Kit.js';
+import { cropGeo, cropStage } from '../art/CropModels.js';
+import { CROPS } from '../data/crops.js';
 import { PLOT, plotPos, plotId } from '../data/layout.js';
 
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
+const _up = new THREE.Vector3(0, 1, 0);
+const PLANT_OFFSETS = [[-0.42, -0.34], [0.42, -0.34], [0, 0.42]];
 
 // Luống đất cày nổi 3D siêu nhẹ (không đổ bóng để tối ưu 60 FPS tuyệt đối khi tưới nước & trồng cây)
 function buildFurrowGeo() {
@@ -18,12 +22,13 @@ export class CropView {
     this.ctx = ctx; this.group = new THREE.Group(); ctx.scene.add(this.group);
     const max = PLOT.cols * PLOT.maxRows; this.max = max;
     // Nền đất từng ô (tắt castShadow để không bao giờ gây lag trên điện thoại)
-    this.soil = new THREE.InstancedMesh(B(1.88, 0.24, 1.88, 0.06), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, metalness: 0.01 }), max);
+    this.soil = new THREE.InstancedMesh(B(1.88, 0.24, 1.88, 0.06), new THREE.MeshLambertMaterial({ color: 0xffffff }), max);
     this.soil.receiveShadow = true; this.soil.castShadow = false; this.soil.frustumCulled = false;
-    // Luống đất / màu trạng thái cây trồng (hiển thị trực quan bằng màu sắc + thanh thời gian trên HUD thay vì mesh hoa quả 3D nặng)
-    this.furrows = new THREE.InstancedMesh(buildFurrowGeo(), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.75, metalness: 0.02 }), max);
+    this.furrows = new THREE.InstancedMesh(buildFurrowGeo(), new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true }), max);
     this.furrows.receiveShadow = false; this.furrows.castShadow = false; this.furrows.frustumCulled = false;
     this.sig = new Array(max).fill('');
+    this.plants = new Map();
+    this.plantMat = new THREE.MeshLambertMaterial({ vertexColors: true });
     this.group.add(this.soil, this.furrows);
     this.borderGroup = new THREE.Group(); this.group.add(this.borderGroup); this.borderRows = 0;
     // Khung sáng vuông bo góc báo ô đất đang chọn
@@ -40,6 +45,10 @@ export class CropView {
   }
 
   buildBorder(rows) {
+    for (const child of this.borderGroup.children) {
+      child.geometry?.dispose();
+      if (child.material?.map) { child.material.map.dispose(); child.material.dispose(); }
+    }
     this.borderGroup.clear();
     this.sig.fill('');
     const x0 = PLOT.x0 - 1.52, x1 = PLOT.x0 + (PLOT.cols - 1) * PLOT.sp + 1.52;
@@ -127,6 +136,35 @@ export class CropView {
     this.ring.material.color.setHex(color);
   }
 
+  syncPlants(st, rows) {
+    for (const batch of this.plants.values()) batch.count = 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < PLOT.cols; c++) {
+      const cr = st.crops[plotId(r, c)];
+      if (!cr?.crop || !CROPS[cr.crop]) continue;
+      const stage = cr.s === 'ripe' ? 2 : cropStage(cr.g || 0), key = `${cr.crop}:${stage}`;
+      let batch = this.plants.get(key);
+      if (!batch) {
+        // Một draw call cho các cây cùng loại/cùng giai đoạn, không tạo Mesh từng ô.
+        batch = new THREE.InstancedMesh(cropGeo(cr.crop, stage), this.plantMat, this.max * PLANT_OFFSETS.length);
+        batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        batch.count = 0; batch.castShadow = false; batch.receiveShadow = false;
+        this.plants.set(key, batch); this.group.add(batch);
+      }
+      const p = plotPos(r, c);
+      for (let j = 0; j < PLANT_OFFSETS.length; j++) {
+        const [dx, dz] = PLANT_OFFSETS[j];
+        _p.set(p.x + dx, 0.26, p.z + dz);
+        _s.setScalar(0.88 + (j % 2) * 0.06);
+        _q.setFromAxisAngle(_up, (r * 3 + c + j) * 1.7);
+        batch.setMatrixAt(batch.count++, _m.compose(_p, _q, _s));
+      }
+    }
+    for (const batch of this.plants.values()) {
+      batch.visible = batch.count > 0;
+      if (batch.visible) { batch.instanceMatrix.needsUpdate = true; batch.computeBoundingSphere(); }
+    }
+  }
+
   update(dt, st, t) {
     const rows = st.farm.plotRows, rain = st.world.weather === 'rain' || st.world.weather === 'storm', wt = st.world.t;
     const activeCount = rows * PLOT.cols;
@@ -140,8 +178,9 @@ export class CropView {
         const i = r * PLOT.cols + c, id = plotId(r, c), cr = st.crops[id];
         const wet = cr && (cr.w > wt || rain);
         const stateCode = !cr ? 'g' : cr.s === 'ripe' ? 'r' : cr.crop ? (wet ? 'pw' : 'pd') : (wet ? 'w' : 't');
-        if (this.sig[i] === stateCode) continue;
-        this.sig[i] = stateCode;
+        const sig = `${stateCode}:${cr?.crop || ''}:${cr?.crop ? cropStage(cr.g || 0) : ''}`;
+        if (this.sig[i] === sig) continue;
+        this.sig[i] = sig;
         matrixDirty = true;
         const p = plotPos(r, c);
 
@@ -154,7 +193,7 @@ export class CropView {
           _c.setHex(stateCode === 'g' ? 0xa47d55 : (stateCode === 'w' || stateCode === 'pw') ? 0x3e2412 : 0x7e4f2b)
         );
 
-        // Luống đất đổi màu nhẹ theo trạng thái (Đang lớn: Xanh lá mầm • Chín: Vàng óng • Chỉ hiện thanh tiến trình + thời gian trên HUD để 0 lag!)
+        // Đất giữ màu tự nhiên; hình dáng cây cho biết loại cây và giai đoạn lớn.
         if (stateCode === 'g') {
           _p.set(p.x, -2, p.z); _s.set(0.001, 0.001, 0.001);
         } else {
@@ -162,14 +201,15 @@ export class CropView {
         }
         this.furrows.setMatrixAt(i, _m.compose(_p, _q.identity(), _s));
         const furrowColor =
-          stateCode === 'r' ? 0xf59e0b :
-          stateCode === 'pw' ? 0x2e7d32 :
-          stateCode === 'pd' ? 0x558b2f :
+          stateCode === 'r' ? 0xaa7444 :
+          stateCode === 'pw' ? 0x65402a :
+          stateCode === 'pd' ? 0x98623d :
           stateCode === 'w' ? 0x3b2110 : 0x8e5a32;
         this.furrows.setColorAt(i, _c.setHex(furrowColor));
       }
     }
     if (matrixDirty) {
+      this.syncPlants(st, rows);
       this.soil.instanceMatrix.needsUpdate = true;
       this.furrows.instanceMatrix.needsUpdate = true;
       if (this.soil.instanceColor) this.soil.instanceColor.needsUpdate = true;

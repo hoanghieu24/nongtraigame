@@ -153,7 +153,19 @@ export class Game {
     fv.showGhost(b.item, area, x, z, b.rot, b.valid);
   }
   // ---------- luồng chơi ----------
-  stepSession() { const now = performance.now(), el = Math.min(1, (now - this.lastStep) / 1000); this.lastStep = now; if (this.mode === 'play') this.session.tick(el); }
+  stepSession() {
+    const now = performance.now(), el = Math.min(1, (now - this.lastStep) / 1000); this.lastStep = now;
+    if (this.mode !== 'play') return;
+    this.session.tick(el);
+    if (document.hidden) {
+      if (this.session.isHost && this.rsc2d?.active) {
+        // Keep the shared kitchen running when the host switches tabs, without drawing.
+        for (let left = el; left > 1e-6;) { const step = Math.min(0.1, left); this.rsc2d.update(step, false); left -= step; }
+      }
+      this.autosaveT += el;
+      if (this.autosaveT >= CFG.AUTOSAVE_S) { this.autosaveT = 0; this.persist(false); }
+    }
+  }
   async startFarm({ profile, farmName, state }) {
     this.myId = profile.id; this.session.startHost({ profile, farmName, state }); this.afterStart(); this.persist(false);
   }
@@ -161,12 +173,13 @@ export class Game {
   onJoined() { this.afterStart(); this.ui.toast('🎉 Đã vào nông trại của bạn bè! Tiến độ được lưu trên máy bạn', 'good'); setTimeout(() => this.persist(false), 1500); }
   afterStart() {
     this.myId = this.session.myId; this.mode = 'play'; this.local.spawn(); this.audio.init();
+    this.rsc2d?.resetState();
     this.rig.applyPrefs(this.settings);
     this.setView(this.settings.view === 'FP' ? '3D' : this.settings.view);
     this.ui.enterGame();
     this.rig.tYaw = this.rig.yaw = 0.08;
-    this.rig.tPitch = this.rig.pitch = this.input.mobile ? 0.56 : 0.58;
-    this.rig.tDist = this.rig.dist = this.input.mobile ? 13.8 : 15.0;
+    this.rig.tPitch = this.rig.pitch = this.input.mobile ? 0.70 : 0.66;
+    this.rig.tDist = this.rig.dist = this.input.mobile ? 15.0 : 15.5;
     this.autosaveT = 0; this.lastStep = performance.now();
   }
   onDisconnected() { this.ui.toast('Mất kết nối với chủ farm 😢', 'warn'); this.backToMenu(); }
@@ -186,17 +199,31 @@ export class Game {
   }
   poses() { if (this.session.role === 'host') return this.sim.poses; return { ...this.session.remotePoses, [this.myId]: this.local.pose }; }
   // ---------- vòng lặp ----------
-  loop = (now) => { if (this.debug) window.__frames = (window.__frames || 0) + 1; const dt = Math.min(0.1, (now - this.last) / 1000); this.last = now; try { this.update(dt); } catch (e) { if (!this._err) { this._err = 1; console.error('[game]', e); } } requestAnimationFrame(this.loop); };
-  update(dt) {
+  loop = (now) => {
+    const frameDt = Math.max(0, (now - this.last) / 1000); this.last = now;
+    // Hidden tabs keep their shared simulation alive via stepSession's background timer.
+    if (!document.hidden) {
+      if (this.debug) window.__frames = (window.__frames || 0) + 1;
+      try { this.update(Math.min(0.1, frameDt), frameDt); }
+      catch (e) { if (!this._err) { this._err = 1; console.error('[game]', e); } }
+    }
+    requestAnimationFrame(this.loop);
+  };
+  update(dt, frameDt = dt) {
     this.t += dt; const st = this.store.state, rig = this.rig, play = this.mode === 'play';
     if (play) this.stepSession(); else this.sim.tick(dt);
+    const ti = timeInfo(st.world.t, CFG);
+    if (play) {
+      this.autosaveT += dt;
+      if (this.autosaveT >= CFG.AUTOSAVE_S) { this.autosaveT = 0; this.persist(false); }
+    }
     if (play && this.rsc2d?.active) {
       this.rsc2d.update(dt);
-      const ti = timeInfo(st.world.t, CFG);
+      this.audio.tick(dt, { hour: ti.hour, rain: false, wind: false, river: 0, night: ti.night, indoor: true });
       this.ui.update(dt, ti);
       return;
     }
-    const ti = timeInfo(st.world.t, CFG), l = this.local; if (play) { l.update(dt); this.ctx.localPos = l.pose; }
+    const l = this.local; if (play) { l.update(dt); this.ctx.localPos = l.pose; }
     const lk = this.input.consumeLook();
     if ((lk.x || lk.y) && play) rig.look(lk.x, lk.y);
     if (play && this.view === '3D' && !this.input.mobile) { const ck = this.input.camKeys(); if (ck) rig.rotate(ck * dt * 1.9); }
@@ -213,7 +240,7 @@ export class Game {
     const v = this.views; v.crop.update(dt, st, this.t); v.animal.update(dt, st, this.t, f2, rig.cam); v.player.update(dt, st, play ? this.poses() : {}, this.myId, area, this.t);
     v.npc.update(dt, st, this.t, f2, rig.cam, area); v.thief.update(dt, st, this.t, area); v.zombie.update(dt, st, this.t, area); v.furn.update(dt, st, this.t, area, f2); v.rest.update(dt, st, this.t, area); v.ev.update(dt, st, this.t, f2, area);
     if (play) { v.crop.setTarget(l.plot && area === 'out' && TOOLS[l.tool] !== 'feed' && TOOLS[l.tool] !== 'rod' && TOOLS[l.tool] !== 'weapon' ? l.plot.x : null, l.plot?.z, l.plot?.c?.s === 'ripe' ? 0xffe066 : TOOLS[l.tool] === 'can' ? 0x7fd0ff : 0xffffff); this.updateBuild(st); this.fpToolUpdate(dt, st); } else v.crop.setTarget(null);
-    this.fx.update(dt, rig.cam); this.gfx.governor(dt);
+    this.fx.update(dt, rig.cam); this.gfx.governor(frameDt);
     this.audio.listener.x = f2.x; this.audio.listener.z = f2.z;
     const rd = play && area === 'out' ? Math.abs(l.z - riverZ(l.x)) : 99;
     this.audio.tick(dt, {
@@ -224,8 +251,7 @@ export class Game {
       night: ti.night,
       indoor: area === 'house',
     });
-    if (play) { const me = l.me; if (me?.fishing?.phase === 'reel' && !this.fishGameOn) this.startFishGame(me.fishing); if (!me?.fishing && this.fishGameOn) { this.fishGameOn = false; this.ui.fish.stop(); }
-      this.autosaveT += dt; if (this.autosaveT > CFG.AUTOSAVE_S) { this.autosaveT = 0; this.persist(false); } }
+    if (play) { const me = l.me; if (me?.fishing?.phase === 'reel' && !this.fishGameOn) this.startFishGame(me.fishing); if (!me?.fishing && this.fishGameOn) { this.fishGameOn = false; this.ui.fish.stop(); } }
     this.ui.update(dt, ti);
     this.gfx.renderer.render(this.gfx.scene, rig.cam);
   }

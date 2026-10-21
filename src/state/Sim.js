@@ -28,6 +28,7 @@ import { VitalsSystem } from '../player/VitalsSystem.js';
 export class Sim {
   constructor(store, opts = {}) {
     this.store = store;
+    this.now = opts.now || Date.now;   // đồng hồ lịch riêng để ngày thưởng không phụ thuộc thời gian mô phỏng
     this.bus = new EventBus();         // 'fx' (hiệu ứng) và 'game' (sự kiện gameplay cho quest/tutorial)
     this.rng = new Rng(opts.seed ?? store.state.meta.seed ?? Date.now());
     this.poses = {};                   // pid -> {x,z,rot,area,anim,tool} (tạm thời, không lưu)
@@ -107,6 +108,7 @@ export class Sim {
     const h = this.handlers[cmd?.type];
     if (!h) return { ok: false, msg: 'Lệnh không hợp lệ' };
     if (!this.st.players[pid]) return { ok: false, msg: 'Người chơi không tồn tại' };
+    this.systems.quest.refreshCalendar();
     let r;
     try { r = h(pid, cmd) || { ok: true }; } catch (e) { console.warn('[sim] lỗi lệnh', cmd.type, e); r = { ok: false, msg: 'Có lỗi nhỏ, thử lại nhé' }; }
     if (r.ok === false && r.msg) this.toast(pid, r.msg, 'warn');

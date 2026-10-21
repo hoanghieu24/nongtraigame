@@ -8,6 +8,7 @@ export class ClockSystem {
     const st = this.sim.st, w = st.world;
     w.t += dt; st.meta.playTime += dt;
     const ti = timeInfo(w.t, CFG);
+    this.sim.ti = ti;
     if (ti.day !== w.day) { w.day = ti.day; w.season = ti.season; this.sim.newDay(); this.sim.touch('world'); }
     this.acc += dt; if (this.acc >= 1) { this.acc = 0; this.sim.sys('quest')?.refreshCalendar(); this.sim.touch('world'); }
   }
@@ -17,9 +18,9 @@ export class ClockSystem {
     const canSleep = h >= 18 || h < 5.5 || wx === 'rain' || wx === 'storm';
     if (!canSleep) return fail('Chỉ có thể đi ngủ vào buổi tối (từ 18:00) hoặc khi trời đang mưa! 🌙🌧️');
     const me = sim.pos(pid);
-    const bed = Object.values(st.furniture).find((f) => f.item === 'bed' && f.area === 'house' && dist(INTERIOR.ox + f.x, INTERIOR.oz + f.z, me.x, me.z) < 4.8)
-      || Object.values(st.furniture).find((f) => f.item === 'bed' && f.area === 'house');
-    if (!bed) return fail('Cần có giường trong nhà để ngủ 🛏️');
+    if (me.area !== 'house') return fail('Vào nhà và lại gần giường để ngủ nhé 🛏️');
+    const bed = Object.values(st.furniture).find((f) => f.item === 'bed' && f.area === 'house' && dist(INTERIOR.ox + f.x, INTERIOR.oz + f.z, me.x, me.z) < 4.8);
+    if (!bed) return fail('Lại gần giường trong nhà để ngủ 🛏️');
     p.sleeping = true; p.bed = { x: bed.x, z: bed.z };
     sim.setPose(pid, { area: 'house', x: INTERIOR.ox + bed.x, z: INTERIOR.oz + bed.z + 0.72, anim: 'sleep' });
     sim.touch('players.' + pid); sim.fx({ k: 'sfx', name: 'sad', to: pid });
@@ -35,12 +36,17 @@ export class ClockSystem {
   skipNight() {
     const { sim } = this, st = sim.st, w = st.world, h = timeInfo(w.t, CFG).hour; let dh = 6 - h; if (dh <= 0) dh += 24;
     w.t += (dh / 24) * CFG.DAY_SECONDS;
+    sim.ti = timeInfo(w.t, CFG);
+    if (sim.ti.day !== w.day) {
+      w.day = sim.ti.day; w.season = sim.ti.season;
+      sim.newDay();
+    }
     for (const p of sim.connected()) {
       if (p.sleeping) sim.sys('vitals')?.sleepRecovery(p.id);
       p.sleeping = false; sim.touch('players.' + p.id);
     }
-    for (const a of Object.values(st.animals)) if (a.type !== 'dog') a.hunger = Math.min(0.95, a.hunger + 0.08);
-    st.zombies = {}; sim.touch('zombies'); w.weatherUntil = w.t; st.events.next = w.t + 70;
+    for (const a of Object.values(st.animals)) if (a.type !== 'dog') { a.hunger = Math.min(0.95, a.hunger + 0.08); sim.touch('animals.' + a.id); }
+    st.zombies = {}; sim.touch('zombies'); w.weatherUntil = w.t; st.events.next = w.t + 70; sim.touch('events');
     w.sleepCycle = (w.sleepCycle || 0) + 1; sim.touch('world');
     sim.fx({ k: 'banner', text: '☀️ Chào buổi sáng!', sub: 'Cả nhà đã ngủ ngon giấc, ngày mới bắt đầu!', tone: 'good' }); sim.fx({ k: 'sfx', name: 'win' });
   }

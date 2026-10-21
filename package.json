@@ -8,7 +8,8 @@
     "build": "vite build",
     "start": "node server.mjs",
     "preview": "vite preview",
-    "test": "node tests/sim.test.mjs",
+    "test": "node tests/sim.test.mjs && node --test tests/kitchen.test.mjs tests/render.test.mjs",
+    "test:browser": "node tests/browser-smoke.mjs",
     "sync": "node auto-sync.mjs",
     "watch-sync": "node auto-sync.mjs --watch",
     "go": "node auto-sync.mjs && npx vite --host"

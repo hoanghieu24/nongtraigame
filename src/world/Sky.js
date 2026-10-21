@@ -4,17 +4,18 @@ import { smooth, clamp, lerp, mulberry32 } from '../core/util.js';
 
 const K = (h, top, hor, sun, sunI, hs, hg, hi, fog, cloud, ex = 1.1) => ({ h, top: new THREE.Color(top), hor: new THREE.Color(hor), sun: new THREE.Color(sun), sunI, hs: new THREE.Color(hs), hg: new THREE.Color(hg), hi, fog: new THREE.Color(fog), cloud: new THREE.Color(cloud), ex });
 const KEYS = [
-  K(0,    0x0e1736, 0x26335f, 0x8fa6ff, 0.45, 0x4a5a98, 0x1c2640, 0.65, 0x1d2a52, 0x3a4770, 0.98),
+  K(0,    0x14213e, 0x344463, 0xb3c5ed, 0.5, 0x8d9fbd, 0x465f4d, 0.9, 0x314360, 0x53627c, 1.06),
   K(5,    0x2b3b7a, 0xf0a08a, 0xffa57a, 0.62, 0xc9a8c8, 0x4a5a58, 0.62, 0xe8a894, 0xd8a0a0, 1.04),
   K(6.8,  0x5caef2, 0xffe4be, 0xffd296, 1.65, 0xfff0dc, 0x7cb05e, 1.02, 0xffe6cc, 0xfff2e6, 1.12),
   K(9,    0x4da8f0, 0xdff2ff, 0xfff5e0, 2.15, 0xebf7ff, 0x84bd64, 1.08, 0xdff2ff, 0xffffff, 1.14),
   K(15,   0x4da8f0, 0xdff2ff, 0xfff5e0, 2.15, 0xebf7ff, 0x84bd64, 1.08, 0xdff2ff, 0xffffff, 1.14),
   K(17.6, 0x5ea2e8, 0xffe0b0, 0xffc67a, 1.75, 0xfff0dc, 0x96b874, 1.08, 0xffe8cc, 0xfff0dc, 1.10),
   K(19.2, 0x5260b0, 0xff9a78, 0xff8a60, 0.98, 0xffc4ac, 0x8a7a8a, 0.98, 0xffb69a, 0xffb8a8, 1.04),
-  K(20.8, 0x1f2a5c, 0x6a5a8c, 0x9aa8ff, 0.48, 0x5a68a8, 0x2a3248, 0.65, 0x39406e, 0x56608c, 0.99),
-  K(24,   0x0e1736, 0x26335f, 0x8fa6ff, 0.45, 0x4a5a98, 0x1c2640, 0.65, 0x1d2a52, 0x3a4770, 0.98),
+  K(20.8, 0x253652, 0x69718e, 0xb3c5ed, 0.5, 0x8d9fbd, 0x465f4d, 0.9, 0x394b69, 0x62718a, 1.06),
+  K(24,   0x14213e, 0x344463, 0xb3c5ed, 0.5, 0x8d9fbd, 0x465f4d, 0.9, 0x314360, 0x53627c, 1.06),
 ];
 const RAIN = { top: new THREE.Color(0x7d8fa0), hor: new THREE.Color(0xb7c3cc), fog: new THREE.Color(0xaab6c0), cloud: new THREE.Color(0x8f9aa6) };
+const WEATHER = { clear: [0, 0, 0, 0], cloudy: [0.5, 0, 0, 0], rain: [0.85, 1, 0, 0], storm: [1, 1, 0, 0], fog: [0.6, 0, 1, 0], snow: [0.55, 0, 0, 1] };
 const DOME_VS = `varying vec3 vP; void main(){ vP=position; vec4 p=modelViewMatrix*vec4(position,1.0); gl_Position=projectionMatrix*p; }`;
 const DOME_FS = `uniform vec3 uTop,uHor,uBot,uSunDir,uSunCol; uniform float uSunK; varying vec3 vP;
 void main(){ vec3 n=normalize(vP); float y=n.y; vec3 col=mix(uHor,uTop,smoothstep(0.0,0.62,y)); col=mix(col,uBot,smoothstep(0.0,-0.35,y));
@@ -32,7 +33,7 @@ const _mat = new THREE.Matrix4(), _quat = new THREE.Quaternion(), _scl = new THR
 
 export class Sky {
   constructor(scene) {
-    this.scene = scene; this.glows = []; this.rain = 0; this.night = 0; this.hour = 9; this.rainK = 0;
+    this.scene = scene; this.glows = new Set(); this.rain = 0; this.night = 0; this.hour = 9; this.rainK = 0; this.time = 0;
     this.hemi = new THREE.HemisphereLight(0xeaf6ff, 0x86b866, 1.05); scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xfff3dc, 2.1); this.sun.castShadow = true; this.sun.shadow.bias = -0.0006; this.sun.shadow.normalBias = 0.035;
     const sc = this.sun.shadow.camera; sc.left = -20; sc.right = 20; sc.top = 20; sc.bottom = -20; sc.near = 2; sc.far = 110; scene.add(this.sun, this.sun.target);
@@ -69,16 +70,19 @@ export class Sky {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3).setUsage(THREE.DynamicDrawUsage));
     this.rainMesh = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xcfe3f2, transparent: true, opacity: 0.0, depthWrite: false, fog: false })); this.rainMesh.frustumCulled = false; this.rainMesh.renderOrder = 9; this.scene.add(this.rainMesh);
   }
-  registerGlow(s) { this.glows.push(s); }
+  registerGlow(s) { if (s?.material && s.userData.glow !== undefined) this.glows.add(s); }
+  unregisterGlows(root) { root?.traverse((o) => this.glows.delete(o)); }
   applyQuality(q, gfx) {
     this.clouds.count = Math.min(10, q.clouds); this.rainDrops = q.shadows ? this.rainN : Math.floor(this.rainN * 0.5);
+    this.snowDrops = Math.min(this.snowN, q.particles);
+    this.snowMesh.geometry.setDrawRange(0, this.snowDrops);
     const sh = this.sun.shadow; if (sh.mapSize.x !== q.shadowMap) { sh.mapSize.set(q.shadowMap, q.shadowMap); sh.map?.dispose(); sh.map = null; }
-    this.sun.castShadow = gfx.renderer.shadowMap.enabled;
+    this.shadowsEnabled = gfx.renderer.shadowMap.enabled; this.sun.castShadow = this.shadowsEnabled;
     this.far = q.pr <= 1 ? 92 : 112;
   }
   update(dt, hour, weather, focus, camPos, mode2D, indoor = false) {
-    this.hour = hour;
-    const WX = { clear: [0, 0, 0, 0], cloudy: [0.5, 0, 0, 0], rain: [0.85, 1, 0, 0], storm: [1, 1, 0, 0], fog: [0.6, 0, 1, 0], snow: [0.55, 0, 0, 1] }, [tg, tr, tf, ts] = WX[weather] || WX.clear, wk = 1 - Math.exp(-0.8 * dt);
+    this.hour = hour; this.time += dt;
+    const [tg, tr, tf, ts] = WEATHER[weather] || WEATHER.clear, wk = 1 - Math.exp(-0.8 * dt);
     this.rainK = lerp(this.rainK, tg, wk); this.dropK = lerp(this.dropK || 0, tr, wk); this.fogK = lerp(this.fogK || 0, tf, wk); this.snowK = lerp(this.snowK || 0, ts, wk); this.flash = Math.max(0, (this.flash || 0) - dt * 3.2);
     let i = 0; while (i < KEYS.length - 2 && hour >= KEYS[i + 1].h) i++;
     const A = KEYS[i], Bk = KEYS[i + 1], f = smooth(A.h, Bk.h, hour), rk = this.rainK;
@@ -99,7 +103,7 @@ export class Sky {
     u.uSunDir.value.copy(_dir); u.uSunCol.value.copy(_sunC); u.uSunK.value = (day ? 1 : 0.1) * (1 - rk * 0.8);
     this.sun.color.copy(_sunC); this.sun.intensity = sunI * (mode2D ? 1.1 : 1.08);
     this.hemi.color.copy(_hs); this.hemi.groundColor.copy(_hg); this.hemi.intensity = hi * (mode2D ? 1.3 : 1.24) + this.flash * 2.2;
-    this.sun.castShadow = !indoor && !mode2D && this.sun.shadow.mapSize.x > 512;
+    this.sun.castShadow = this.shadowsEnabled && !indoor && !mode2D;
     if (!indoor) {
       const tx = Math.round(focus.x / 4) * 4, tz = Math.round(focus.z / 4) * 4;
       this.sun.target.position.set(tx, focus.y, tz);
@@ -117,6 +121,7 @@ export class Sky {
     _md.set(-_dir.x, Math.max(0.2, 0.9 - Math.abs(Math.sin(a)) * 0.2), 0.5).normalize().multiplyScalar(102).add(camPos);
     this.moon.position.copy(_md); this.moon.lookAt(camPos); this.moon.visible = !day && !mode2D && !indoor;
     this.stars.position.copy(camPos); this.stars.material.opacity = this.night * (1 - rk) * (mode2D || indoor ? 0 : 1);
+    this.stars.visible = this.stars.material.opacity > 0.02;
     // mây
     this.clouds.visible = !mode2D && !indoor;
     if (this.clouds.visible) {
@@ -137,10 +142,10 @@ export class Sky {
     // mưa & tuyết: tắt hoàn toàn hạt mưa/tuyết rơi khi đang ở trong nhà (!indoor)
     this.rainMesh.visible = !indoor && this.dropK > 0.03; this.rainMesh.material.opacity = 0.5 * this.dropK;
     this.snowMesh.visible = !indoor && this.snowK > 0.03; this.snowMesh.material.opacity = 0.9 * this.snowK;
-    if (this.snowMesh.visible) { const sp = this.snowMesh.geometry.attributes.position.array, tt = performance.now() / 1000; for (let k = 0; k < this.snowN; k++) { const r = this.snowSeed[k]; sp[k * 3] = focus.x + r[0] + Math.sin(tt * 0.8 + r[3]) * 0.8; sp[k * 3 + 1] = 22 - ((tt * 2.4 + r[1]) % 22); sp[k * 3 + 2] = focus.z + r[2] + Math.cos(tt * 0.7 + r[3]) * 0.8; } this.snowMesh.geometry.attributes.position.needsUpdate = true; }
+    if (this.snowMesh.visible) { const sp = this.snowMesh.geometry.attributes.position.array, tt = this.time; for (let k = 0; k < this.snowDrops; k++) { const r = this.snowSeed[k]; sp[k * 3] = focus.x + r[0] + Math.sin(tt * 0.8 + r[3]) * 0.8; sp[k * 3 + 1] = 22 - ((tt * 2.4 + r[1]) % 22); sp[k * 3 + 2] = focus.z + r[2] + Math.cos(tt * 0.7 + r[3]) * 0.8; } this.snowMesh.geometry.attributes.position.needsUpdate = true; }
     if (this.rainMesh.visible) {
-      const pos = this.rainMesh.geometry.attributes.position.array, t = performance.now() / 1000, n = this.rainDrops || this.rainN;
-      for (let k = 0; k < n; k++) { const r = this.rainSeed[k], y = 26 - ((t * r[3] + r[1]) % 26); const x = focus.x + r[0], z = focus.z + r[2]; pos.set([x, y, z, x - 0.12, y + 1.1, z - 0.05], k * 6); }
+      const pos = this.rainMesh.geometry.attributes.position.array, t = this.time, n = this.rainDrops || this.rainN;
+      for (let k = 0; k < n; k++) { const r = this.rainSeed[k], y = 26 - ((t * r[3] + r[1]) % 26), i = k * 6; const x = focus.x + r[0], z = focus.z + r[2]; pos[i] = x; pos[i + 1] = y; pos[i + 2] = z; pos[i + 3] = x - 0.12; pos[i + 4] = y + 1.1; pos[i + 5] = z - 0.05; }
       this.rainMesh.geometry.setDrawRange(0, n * 2); this.rainMesh.geometry.attributes.position.needsUpdate = true;
     }
   }

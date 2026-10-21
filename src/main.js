@@ -1,3 +1,9 @@
+import '@fontsource/baloo-2/latin-600.css';
+import '@fontsource/baloo-2/latin-700.css';
+import '@fontsource/baloo-2/latin-800.css';
+import '@fontsource/baloo-2/vietnamese-600.css';
+import '@fontsource/baloo-2/vietnamese-700.css';
+import '@fontsource/baloo-2/vietnamese-800.css';
 import { Game } from './core/Game.js';
 import { UI } from './ui/UI.js';
 import { setupViewport } from './core/Viewport.js';
