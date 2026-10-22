@@ -12,7 +12,7 @@ export class CameraRig {
     this.ortho = new THREE.OrthographicCamera(-10, 10, 10, -10, -80, 260);
     this.cam = this.persp; this.mode = '3D'; this.aspect = aspect;
     // Góc nhìn 3D gần hơn (dist = 14.5 thay vì 26), góc nghiêng 0.58 giúp nhân vật, cây trồng và thú cưng to rõ, sắc nét
-    this.yaw = 0.08; this.pitch = 0.66; this.dist = 15.5; this.tYaw = 0.08; this.tPitch = 0.66; this.tDist = 15.5;
+    this.yaw = 0.08; this.pitch = 0.58; this.dist = 14.5; this.tYaw = 0.08; this.tPitch = 0.58; this.tDist = 14.5;
     this.fpPitch = 0; this.tFpPitch = 0;
     this.velYaw = 0; this.velPitch = 0;
     // Tuỳ chỉnh người chơi: fov (45..90, mặc định 54 cho 3D nét căng), sens (0.3..2.2, mặc định 1.0), smooth (0.1..1.0, mặc định 0.8)
@@ -67,9 +67,9 @@ export class CameraRig {
   zoomBy(f) { this.tDist = clamp(this.tDist * f, 7.5, 28); }
   // Chuyển nhanh 3 mức cự ly camera 3D: Gần sát rõ nét (11m) -> Vừa chuẩn (14.5m) -> Rộng (20m)
   cycleZoomPreset() {
-    if (this.tDist > 17) { this.tDist = 11.0; this.tPitch = 0.62; return '🔍 Nhìn gần'; }
-    if (this.tDist < 13) { this.tDist = 15.5; this.tPitch = 0.66; return '🎥 Góc nhìn tiêu chuẩn'; }
-    this.tDist = 19.5; this.tPitch = 0.74; return '🌄 Nhìn toàn cảnh';
+    if (this.tDist > 17) { this.tDist = 11.0; this.tPitch = 0.52; return '🔍 Cận cảnh HD (Siêu nét)'; }
+    if (this.tDist < 13) { this.tDist = 14.5; this.tPitch = 0.58; return '🎥 Cự ly Chuẩn (Mượt & Rõ)'; }
+    this.tDist = 19.5; this.tPitch = 0.66; return '🌄 Góc nhìn Rộng';
   }
   forward() { const y = this.mode === '2D' ? 0 : this.yaw; return { x: -Math.sin(y), z: -Math.cos(y) }; }
   right() { const y = this.mode === '2D' ? 0 : this.yaw; return { x: Math.cos(y), z: -Math.sin(y) }; }

@@ -178,8 +178,8 @@ export class Game {
     this.setView(this.settings.view === 'FP' ? '3D' : this.settings.view);
     this.ui.enterGame();
     this.rig.tYaw = this.rig.yaw = 0.08;
-    this.rig.tPitch = this.rig.pitch = this.input.mobile ? 0.70 : 0.66;
-    this.rig.tDist = this.rig.dist = this.input.mobile ? 15.0 : 15.5;
+    this.rig.tPitch = this.rig.pitch = this.input.mobile ? 0.56 : 0.58;
+    this.rig.tDist = this.rig.dist = this.input.mobile ? 13.8 : 15.0;
     this.autosaveT = 0; this.lastStep = performance.now();
   }
   onDisconnected() { this.ui.toast('Mất kết nối với chủ farm 😢', 'warn'); this.backToMenu(); }
